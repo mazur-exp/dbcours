@@ -10,7 +10,32 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_10_07_105635) do
+ActiveRecord::Schema[8.0].define(version: 2025_10_08_071859) do
+  create_table "conversations", force: :cascade do |t|
+    t.integer "user_id", null: false
+    t.datetime "last_message_at"
+    t.integer "unread_count", default: 0
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["last_message_at"], name: "index_conversations_on_last_message_at"
+    t.index ["user_id"], name: "index_conversations_on_user_id"
+  end
+
+  create_table "messages", force: :cascade do |t|
+    t.integer "conversation_id", null: false
+    t.integer "user_id"
+    t.text "body", null: false
+    t.integer "direction", default: 0, null: false
+    t.bigint "telegram_message_id"
+    t.boolean "read", default: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["conversation_id", "created_at"], name: "index_messages_on_conversation_id_and_created_at"
+    t.index ["conversation_id"], name: "index_messages_on_conversation_id"
+    t.index ["telegram_message_id"], name: "index_messages_on_telegram_message_id"
+    t.index ["user_id"], name: "index_messages_on_user_id"
+  end
+
   create_table "users", force: :cascade do |t|
     t.bigint "telegram_id", null: false
     t.string "username"
@@ -20,7 +45,13 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_07_105635) do
     t.boolean "authenticated", default: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "admin", default: false, null: false
+    t.string "avatar_url"
     t.index ["session_token"], name: "index_users_on_session_token", unique: true
     t.index ["telegram_id"], name: "index_users_on_telegram_id", unique: true
   end
+
+  add_foreign_key "conversations", "users"
+  add_foreign_key "messages", "conversations"
+  add_foreign_key "messages", "users"
 end

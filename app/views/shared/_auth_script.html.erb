@@ -55,13 +55,22 @@
           authBtn.disabled = true
           authBtn.classList.add('opacity-75')
 
+          // Очищаем старые данные хранилища (для Safari)
+          try {
+            localStorage.removeItem('auth_session_token')
+            sessionStorage.clear()
+          } catch (e) {
+            console.log('Storage clear error:', e)
+          }
+
           try {
             const response = await fetch('/auth/telegram/start', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-Token': document.querySelector('[name="csrf-token"]').content
-              }
+              },
+              credentials: 'same-origin'  // Явно указываем для Safari
             })
 
             const data = await response.json()
@@ -80,22 +89,34 @@
 
               // Для Telegram WebView ИЛИ мобильного браузера используем одинаковую логику
               if (isTelegramWebView() || isMobileDevice()) {
-                console.log('>>> TELEGRAM WEBVIEW OR MOBILE - using link click method')
-                // Создаём обычную HTML ссылку с HTTPS (не tg://)
-                const link = document.createElement('a')
-                link.href = data.deep_link // https://t.me/bot?start=xxx
+                console.log('>>> TELEGRAM WEBVIEW OR MOBILE - using location.href method')
 
-                // ВАЖНО: target="_blank" только для мобильного браузера, НЕ для Telegram WebView
-                if (!isTelegramWebView() && isMobileDevice()) {
-                  link.target = '_blank'
+                // Для Safari на iOS используем location.href вместо link.click()
+                const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
+
+                if (isSafari) {
+                  console.log('>>> Safari detected - using location.href')
+                  // Сохраняем токен перед переходом
+                  localStorage.setItem('auth_session_token', sessionToken)
+                  // Используем location.href для Safari
+                  window.location.href = data.deep_link
+                } else {
+                  // Для остальных браузеров используем старый метод
+                  const link = document.createElement('a')
+                  link.href = data.deep_link // https://t.me/bot?start=xxx
+
+                  // ВАЖНО: target="_blank" только для мобильного браузера, НЕ для Telegram WebView
+                  if (!isTelegramWebView() && isMobileDevice()) {
+                    link.target = '_blank'
+                  }
+
+                  link.style.display = 'none'
+                  document.body.appendChild(link)
+
+                  // Программно кликаем - Telegram перехватит и откроет бота нативно
+                  link.click()
+                  document.body.removeChild(link)
                 }
-
-                link.style.display = 'none'
-                document.body.appendChild(link)
-
-                // Программно кликаем - Telegram перехватит и откроет бота нативно
-                link.click()
-                document.body.removeChild(link)
 
                 // Сбрасываем состояние кнопки
                 authBtn.disabled = false
@@ -107,6 +128,13 @@
                     document.removeEventListener('visibilitychange', handleReturn)
 
                     console.log('>>> User returned from bot')
+
+                    // Для Safari восстанавливаем токен из localStorage
+                    if (!sessionToken && localStorage.getItem('auth_session_token')) {
+                      sessionToken = localStorage.getItem('auth_session_token')
+                      console.log('>>> Restored session token from localStorage')
+                    }
+
                     showWaitingStatus(authBtn)
 
                     // СРАЗУ проверяем авторизацию через API
@@ -311,7 +339,7 @@
       container.innerHTML = `
         <div class="relative" data-authenticated="true">
           <!-- Кнопка-триггер dropdown -->
-          <button onclick="toggleUserDropdown()" class="bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-1.5 px-3 rounded-lg transition-all flex items-center gap-2 text-sm">
+          <button id="user-dropdown-trigger" class="bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-1.5 px-3 rounded-lg transition-all flex items-center gap-2 text-sm">
             <div class="w-7 h-7 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-xs">
               ${firstLetter}
             </div>
@@ -351,6 +379,15 @@
                 </svg>
                 <span>Курс</span>
               </a>
+
+              ${user.admin ? `
+                <a href="/messenger" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-100 transition-colors text-gray-700">
+                  <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                  </svg>
+                  <span>Messenger</span>
+                </a>
+              ` : ''}
 
               <div class="border-t border-gray-200 my-2"></div>
 
@@ -431,29 +468,47 @@
       }
     }
 
-    // Закрытие dropdown при клике вне его
-    document.addEventListener('click', (e) => {
-      const dropdown = document.getElementById('user-dropdown')
-      const button = e.target.closest('button[onclick*="toggleUserDropdown"]')
+    // Единый обработчик для dropdown (используем только один listener)
+    if (!window.dropdownHandlerInitialized) {
+      window.dropdownHandlerInitialized = true
 
-      if (dropdown && !dropdown.classList.contains('hidden') && !button && !dropdown.contains(e.target)) {
-        dropdown.classList.add('hidden')
-        const chevron = document.getElementById('dropdown-chevron')
-        if (chevron) chevron.classList.remove('rotate-180')
-      }
-    })
-
-    // Закрытие dropdown при нажатии ESC
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
+      document.addEventListener('click', (e) => {
+        const trigger = e.target.closest('#user-dropdown-trigger')
         const dropdown = document.getElementById('user-dropdown')
-        if (dropdown && !dropdown.classList.contains('hidden')) {
-          dropdown.classList.add('hidden')
-          const chevron = document.getElementById('dropdown-chevron')
-          if (chevron) chevron.classList.remove('rotate-180')
+        const chevron = document.getElementById('dropdown-chevron')
+
+        if (trigger) {
+          // Клик по кнопке - переключаем dropdown
+          e.stopPropagation()
+          if (dropdown && chevron) {
+            dropdown.classList.toggle('hidden')
+            chevron.classList.toggle('rotate-180')
+          }
+        } else if (dropdown && !dropdown.classList.contains('hidden')) {
+          // Клик вне dropdown - закрываем
+          if (!dropdown.contains(e.target)) {
+            dropdown.classList.add('hidden')
+            if (chevron) chevron.classList.remove('rotate-180')
+          }
         }
-      }
-    })
+      })
+    }
+
+    // Закрытие dropdown при нажатии ESC (также проверяем инициализацию)
+    if (!window.escHandlerInitialized) {
+      window.escHandlerInitialized = true
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          const dropdown = document.getElementById('user-dropdown')
+          if (dropdown && !dropdown.classList.contains('hidden')) {
+            dropdown.classList.add('hidden')
+            const chevron = document.getElementById('dropdown-chevron')
+            if (chevron) chevron.classList.remove('rotate-180')
+          }
+        }
+      })
+    }
 
     // Экспортируем функции для использования в других местах
     window.showAuthModal = showAuthModal

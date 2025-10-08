@@ -1,6 +1,9 @@
 class ApplicationController < ActionController::Base
-  # Only allow modern browsers supporting webp images, web push, badges, import maps, CSS nesting, and CSS :has.
-  allow_browser versions: :modern
+  # Allow browsers with reasonable version requirements
+  # Safari 15+ (iOS 15+, September 2021)
+  # Chrome 100+ (March 2022)
+  # Firefox 100+ (May 2022)
+  allow_browser versions: { safari: 15, chrome: 100, firefox: 100 }
 
   before_action :set_current_user
 

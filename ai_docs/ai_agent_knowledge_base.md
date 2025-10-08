@@ -984,14 +984,14 @@
 Когда нужно подключить человека, используйте эти контакты:
 
 **Общие вопросы и продажи:**
-Telegram: [@manager_username] (заменить на реальный)
+Telegram: [@mazur_exp] (заменить на реальный)
 Email: support@balideliverymaster.com (заменить на реальный)
 
 **Технические проблемы:**
 Email: tech@balideliverymaster.com (заменить на реальный)
 
 **VIP-клиенты и корпоративные запросы:**
-Telegram: [@vip_manager] (заменить на реальный)
+Telegram: [@mazur_exp] (заменить на реальный)
 Email: vip@balideliverymaster.com (заменить на реальный)
 
 **Жалобы и возвраты:**

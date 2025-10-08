@@ -1,0 +1,26 @@
+<% messages.each do |message| %>
+  <div class="flex <%= message.outgoing? ? 'justify-end' : 'justify-start' %>" data-message-id="<%= message.id %>">
+    <div class="max-w-xl <%= message.outgoing? ? 'order-2' : 'order-1' %>">
+      <!-- Аватарка для входящих -->
+      <% if message.incoming? %>
+        <div class="flex items-start gap-2">
+          <%= user_avatar_or_initials(message.user, css_classes: "flex-shrink-0", size_classes: "w-8 h-8", text_size: "text-xs") %>
+          <div class="flex-1">
+            <div class="bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
+              <p class="text-gray-900 whitespace-pre-wrap break-words"><%= message.body %></p>
+            </div>
+            <p class="text-xs text-gray-500 mt-1 ml-2"><%= message.created_at.strftime("%H:%M") %></p>
+          </div>
+        </div>
+      <% else %>
+        <!-- Исходящие сообщения -->
+        <div class="flex flex-col items-end">
+          <div class="bg-blue-500 text-white rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm">
+            <p class="whitespace-pre-wrap break-words"><%= message.body %></p>
+          </div>
+          <p class="text-xs text-gray-500 mt-1 mr-2"><%= message.created_at.strftime("%H:%M") %></p>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>

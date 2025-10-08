@@ -2,6 +2,7 @@ require 'telegram/bot'
 
 class AuthController < ApplicationController
   skip_before_action :verify_authenticity_token, only: [:webhook]
+  before_action :cleanup_stale_session, only: [:start]
 
   # Генерирует session_token и возвращает Telegram deep link
   def start
@@ -24,7 +25,7 @@ class AuthController < ApplicationController
     if session[:user_id]
       user = User.find_by(id: session[:user_id])
       if user&.authenticated
-        render json: { authenticated: true, user: user.as_json(only: [:username, :first_name, :last_name]) }
+        render json: { authenticated: true, user: user.as_json(only: [:username, :first_name, :last_name, :admin]) }
         return
       end
     end
@@ -43,7 +44,7 @@ class AuthController < ApplicationController
       render json: {
         authenticated: true,
         user_id: user.id,
-        user: user.as_json(only: [:username, :first_name, :last_name])
+        user: user.as_json(only: [:username, :first_name, :last_name, :admin])
       }
     else
       render json: { authenticated: false }
@@ -61,7 +62,7 @@ class AuthController < ApplicationController
 
       if user
         session[:user_id] = user.id
-        render json: { success: true, user: user.as_json(only: [:username, :first_name, :last_name]) }
+        render json: { success: true, user: user.as_json(only: [:username, :first_name, :last_name, :admin]) }
       else
         render json: { success: false, error: "User not found or not authenticated" }, status: :unauthorized
       end
@@ -72,8 +73,7 @@ class AuthController < ApplicationController
 
   # Завершает сессию пользователя
   def logout
-    session[:user_id] = nil
-    session[:auth_token] = nil
+    reset_session  # Полная очистка всей сессии
     redirect_to freecontent_path, notice: "Вы успешно вышли из системы"
   end
 
@@ -86,6 +86,9 @@ class AuthController < ApplicationController
     # Обработка команды /start
     if update["message"] && update["message"]["text"]&.start_with?("/start")
       handle_start_command(update["message"])
+    # Обработка обычных текстовых сообщений (для мессенджера)
+    elsif update["message"] && update["message"]["text"]
+      handle_text_message(update["message"])
     end
 
     # Обработка callback от inline кнопки
@@ -141,6 +144,10 @@ class AuthController < ApplicationController
         authenticated: true
       )
 
+      # Получаем и сохраняем аватарку
+      avatar_url = fetch_user_avatar(from["id"])
+      user.avatar_url = avatar_url if avatar_url
+
       if user.save
         # Отправляем успешное сообщение
         answer_callback_query(callback_query["id"], "✅ Авторизация успешна!")
@@ -156,7 +163,7 @@ class AuthController < ApplicationController
             type: "authenticated",
             user_id: user.id,
             session_token: session_token,
-            user: user.as_json(only: [:username, :first_name, :last_name])
+            user: user.as_json(only: [:username, :first_name, :last_name, :admin])
           }
         )
       else
@@ -216,7 +223,96 @@ class AuthController < ApplicationController
     )
   end
 
+  def handle_text_message(message)
+    telegram_id = message["from"]["id"]
+    user = User.find_by(telegram_id: telegram_id, authenticated: true)
+
+    # Игнорируем сообщения от неавторизованных пользователей
+    return unless user
+
+    # Обновляем аватарку если её нет или прошло время
+    if user.avatar_url.blank? || user.updated_at < 1.day.ago
+      avatar_url = fetch_user_avatar(telegram_id)
+      user.update(avatar_url: avatar_url) if avatar_url
+    end
+
+    Rails.logger.info "Handle text message from user_id=#{user.id}: #{message['text']}"
+
+    # Находим или создаём беседу
+    conversation = user.conversation
+
+    # Создаём сообщение
+    msg = conversation.messages.create!(
+      user: user,
+      body: message["text"],
+      direction: :incoming,
+      telegram_message_id: message["message_id"],
+      read: false
+    )
+
+    Rails.logger.info "Message created: #{msg.id}"
+
+    # Reload conversation для получения актуального last_message_at и unread_count
+    conversation.reload
+
+    # Broadcast через ActionCable для real-time обновления
+    ActionCable.server.broadcast("messenger_channel", {
+      type: "new_message",
+      conversation_id: conversation.id,
+      message: msg.as_json(include: :user),
+      conversation: {
+        id: conversation.id,
+        user: conversation.user.as_json(only: [:id, :first_name, :last_name, :username]),
+        last_message: msg.as_json(only: [:id, :body, :direction, :created_at]),
+        unread_count: conversation.unread_count,
+        last_message_at: conversation.last_message_at
+      }
+    })
+  rescue => e
+    Rails.logger.error "Error in handle_text_message: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
+  end
+
   def bot_client
     @bot_client ||= Telegram::Bot::Client.new(TELEGRAM_BOT_TOKEN)
+  end
+
+  def fetch_user_avatar(telegram_id)
+    begin
+      # Получаем фотографии профиля пользователя
+      photos = bot_client.api.get_user_profile_photos(user_id: telegram_id, limit: 1)
+
+      if photos && photos.photos && photos.photos.any?
+        # Берем первое фото в наилучшем качестве (последний элемент массива - самое большое разрешение)
+        photo_sizes = photos.photos[0]
+        photo = photo_sizes.last if photo_sizes.any?
+
+        if photo && photo.file_id
+          # Получаем информацию о файле
+          file_info = bot_client.api.get_file(file_id: photo.file_id)
+
+          if file_info && file_info.file_path
+            # Формируем URL для скачивания
+            return "https://api.telegram.org/file/bot#{TELEGRAM_BOT_TOKEN}/#{file_info.file_path}"
+          end
+        end
+      end
+    rescue => e
+      Rails.logger.error "Failed to fetch user avatar: #{e.message}"
+    end
+
+    nil # Возвращаем nil если не удалось получить аватарку
+  end
+
+  def cleanup_stale_session
+    # Очищаем старую сессию если прошло больше 5 минут
+    if session[:auth_token] && session[:auth_started_at]
+      if Time.current - session[:auth_started_at].to_time > 5.minutes
+        session.delete(:auth_token)
+        session.delete(:auth_started_at)
+        session.delete(:user_id)
+        Rails.logger.info "Cleaned up stale session"
+      end
+    end
   end
 end

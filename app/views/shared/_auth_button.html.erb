@@ -1,10 +1,8 @@
 <% if @current_user %>
   <div class="relative" data-authenticated="true">
     <!-- Кнопка-триггер dropdown -->
-    <button onclick="toggleUserDropdown()" class="bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-1.5 px-3 rounded-lg transition-all flex items-center gap-2 text-sm">
-      <div class="w-7 h-7 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-xs">
-        <%= (@current_user.first_name || 'U')[0].upcase %>
-      </div>
+    <button id="user-dropdown-trigger" class="bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-1.5 px-3 rounded-lg transition-all flex items-center gap-2 text-sm">
+      <%= user_avatar_or_initials(@current_user, size_classes: "w-7 h-7", text_size: "text-xs") %>
       <span><%= @current_user.first_name || 'Профиль' %></span>
       <svg class="w-3.5 h-3.5 transition-transform text-gray-500" id="dropdown-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -16,9 +14,7 @@
       <!-- Заголовок профиля -->
       <div class="px-4 py-3 bg-gradient-to-r from-blue-50 to-blue-100 border-b border-blue-200">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">
-            <%= (@current_user.first_name || 'U')[0].upcase %>
-          </div>
+          <%= user_avatar(@current_user) %>
           <div>
             <div class="font-bold text-gray-900">
               <%= [@current_user.first_name, @current_user.last_name].compact.join(' ').presence || 'Пользователь' %>
@@ -44,6 +40,15 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
           </svg>
           <span>Курс</span>
+        <% end %>
+
+        <% if @current_user.admin? %>
+          <%= link_to messenger_path, class: "flex items-center gap-3 px-4 py-3 hover:bg-gray-100 transition-colors text-gray-700" do %>
+            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+            </svg>
+            <span>Messenger</span>
+          <% end %>
         <% end %>
 
         <div class="border-t border-gray-200 my-2"></div>
