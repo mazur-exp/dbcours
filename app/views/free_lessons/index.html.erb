@@ -1,0 +1,181 @@
+<div class="min-h-screen bg-gray-50">
+  <!-- Навигация -->
+  <nav class="bg-white shadow-sm border-b border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16">
+        <div class="flex items-center">
+          <%= link_to root_path, class: "flex items-center gap-3" do %>
+            <span class="text-2xl font-bold text-green-600">📚</span>
+            <span class="text-xl font-bold text-gray-900">Bali Food Delivery Master</span>
+          <% end %>
+        </div>
+        <div class="flex items-center gap-4">
+          <%= link_to "Главная", root_path, class: "text-gray-600 hover:text-gray-900" %>
+          <%= render partial: "shared/auth_button" %>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Главная секция -->
+  <div class="bg-gradient-to-r from-green-500 to-green-600 text-white py-12 sm:py-16">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center">
+        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4">
+          Бесплатный мини-курс
+        </h1>
+        <p class="text-lg sm:text-xl lg:text-2xl text-green-50 mb-2">
+          Gojek и Grab для ресторанов на Бали
+        </p>
+        <p class="text-base sm:text-lg text-green-100 max-w-3xl mx-auto">
+          Пошаговое руководство по запуску, росту и масштабированию доставки через Gojek и Grab на основе реального опыта.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Описание курса -->
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div class="bg-white rounded-xl shadow-lg p-6 sm:p-8 mb-12">
+      <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-6">О курсе</h2>
+      <div class="prose max-w-none text-gray-700 mb-8">
+        <p class="text-lg mb-4">
+          Короткий практический курс на основе реального опыта запуска и масштабирования доставки на Бали.
+          Вы узнаете, как оценить рынок, правильно зарегистрировать аккаунты, оформить меню, поднять средний чек,
+          работать с рекламой, менеджерами платформ и рейтингами, а также разберёте типичные кейсы.
+        </p>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-6 mb-8">
+        <div class="bg-green-50 rounded-lg p-6">
+          <div class="text-green-600 font-semibold mb-2">Для кого</div>
+          <ul class="text-gray-700 space-y-1 text-sm">
+            <li>• Владельцы кафе и ресторанов</li>
+            <li>• Операционные менеджеры</li>
+            <li>• Маркетологи</li>
+            <li>• Предприниматели</li>
+          </ul>
+        </div>
+        <div class="bg-blue-50 rounded-lg p-6">
+          <div class="text-blue-600 font-semibold mb-2">Что получите</div>
+          <ul class="text-gray-700 space-y-1 text-sm">
+            <li>• Практические шаги</li>
+            <li>• Чек-листы и шаблоны</li>
+            <li>• Лайфхаки работы</li>
+            <li>• Реальные кейсы</li>
+          </ul>
+        </div>
+        <div class="bg-purple-50 rounded-lg p-6">
+          <div class="text-purple-600 font-semibold mb-2">Результат</div>
+          <ul class="text-gray-700 space-y-1 text-sm">
+            <li>• Действующий план</li>
+            <li>• Рост видимости</li>
+            <li>• Выше конверсия</li>
+            <li>• Больше средний чек</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Список уроков -->
+    <div>
+      <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-8">Программа курса</h2>
+      <div class="space-y-5">
+        <% lesson_icons = ["📚", "📊", "🎯", "⚙️", "🔍", "📝", "💰", "📈", "📢", "👥", "⭐", "❓"] %>
+        <% @lessons.each_with_index do |lesson, index| %>
+          <%= link_to lesson[:path], class: "block group" do %>
+            <div class="bg-white rounded-2xl shadow-md hover:shadow-2xl transition-all p-4 sm:p-6 lg:p-8 border-2 border-transparent hover:border-green-300">
+              <div class="flex items-start gap-4 sm:gap-6">
+                <div class="flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-green-400 via-green-500 to-green-600 rounded-2xl flex items-center justify-center text-white font-bold text-2xl sm:text-3xl shadow-lg group-hover:scale-110 transition-transform">
+                  <%= sprintf("%02d", lesson[:number]) %>
+                </div>
+                <div class="flex-grow min-w-0">
+                  <div class="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+                    <span class="text-2xl sm:text-3xl"><%= lesson_icons[index] || "📄" %></span>
+                    <span class="bg-green-100 text-green-700 px-2 sm:px-3 py-1 rounded-full text-xs font-bold">
+                      УРОК <%= lesson[:number] %>
+                    </span>
+                  </div>
+                  <h3 class="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 mb-2 sm:mb-3 group-hover:text-green-600 transition-colors">
+                    <%= lesson[:title] %>
+                  </h3>
+                  <div class="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-500">
+                    <span class="flex items-center gap-2">
+                      <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+                      </svg>
+                      ~5 минут
+                    </span>
+                    <span class="flex items-center gap-2">
+                      <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/>
+                      </svg>
+                      Бесплатно
+                    </span>
+                  </div>
+                </div>
+                <div class="flex-shrink-0 text-green-600 group-hover:translate-x-2 transition-transform hidden sm:block">
+                  <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+
+    <!-- CTA секция -->
+    <div class="mt-16 bg-gradient-to-r from-blue-500 to-green-500 rounded-2xl p-6 sm:p-8 lg:p-12 text-white text-center">
+      <h2 class="text-2xl sm:text-3xl font-bold mb-4">Готовы к полному курсу?</h2>
+      <p class="text-lg sm:text-xl text-blue-50 mb-8 max-w-2xl mx-auto">
+        Этот мини-курс — только верхушка айсберга. Полный курс включает детальные стратегии,
+        калькуляторы прибыльности, живые воркшопы и персональную поддержку.
+      </p>
+      <%= link_to root_path, class: "inline-block bg-white text-green-600 font-bold py-4 px-12 rounded-lg text-lg hover:bg-green-50 transition-all shadow-lg" do %>
+        Узнать о полном курсе →
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Модальное окно авторизации -->
+  <div id="auth-modal" class="hidden fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 relative">
+      <button onclick="hideAuthModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+
+      <div class="text-center">
+        <div class="mb-6">
+          <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg class="w-12 h-12 text-green-600" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+            </svg>
+          </div>
+          <h2 class="text-3xl font-bold text-gray-900 mb-3">Требуется авторизация</h2>
+          <p class="text-gray-600 mb-6">
+            Чтобы получить доступ к урокам, пожалуйста, авторизуйтесь через Telegram
+          </p>
+        </div>
+
+        <button onclick="document.getElementById('auth-button').click(); hideAuthModal()" class="w-full bg-gradient-to-r from-green-500 to-green-600 text-white font-bold py-4 px-8 rounded-lg hover:from-green-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl mb-4">
+          <span class="flex items-center justify-center gap-2">
+            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295-.002 0-.003 0-.005 0l.213-3.054 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.941z"/>
+            </svg>
+            Авторизоваться через Telegram
+          </span>
+        </button>
+
+        <p class="text-sm text-gray-500">
+          Это быстро, безопасно и займет всего несколько секунд
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%= render partial: "shared/auth_script" %>
