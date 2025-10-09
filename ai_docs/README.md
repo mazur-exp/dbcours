@@ -284,6 +284,45 @@ ai_docs/
 
 ---
 
+### 10. ai_auto_responder.md
+**Purpose:** AI-powered auto-responder with typing indicator documentation
+
+**Contents:**
+- Overview of AI auto-responder flow (10-step process)
+- Architecture components (AuthController, TypingIndicatorJob, N8nController)
+- Typing indicator implementation (4-second loop, ai_processing flag)
+- AI response parsing (JSON code blocks, structured data extraction)
+- Lead qualification fields (ai_real_name, ai_background, ai_query, ai_ready_score)
+- Complete code examples with line numbers
+- Flow diagrams (visual representation of process)
+- N8N workflow configuration (webhook → AI → Rails → Telegram)
+- Troubleshooting guide (typing not showing, parsing errors, stuck indicators)
+- Testing strategies (manual and automated)
+- Security considerations (Bearer token auth)
+
+**Use When:** Implementing AI workflows, debugging typing indicators, understanding lead qualification, troubleshooting N8N integration
+
+---
+
+### 11. n8n_integration.md
+**Purpose:** N8N workflow automation platform integration
+
+**Contents:**
+- N8N configuration (credentials, webhook URLs)
+- Event types (user_registered, message_received, purchase_completed)
+- Webhook payload structures
+- Conversation history format (50 messages for AI context)
+- Bi-directional integration (Rails → N8N, N8N → Rails)
+- POST /api/n8n/send_message endpoint documentation
+- Markdown formatting support
+- AI auto-responder workflow example
+- Security (Bearer token authentication)
+- Error handling and retry logic
+
+**Use When:** Setting up N8N workflows, integrating AI responses, debugging webhooks, understanding automation flows
+
+---
+
 ## How to Use This Documentation
 
 ### For New Team Members
@@ -393,16 +432,16 @@ ai_docs/
 ### File Count
 - **Business:** 5 files
 - **UI:** 4 files
-- **Development:** 9 files
-- **Total:** 18 documentation files
+- **Development:** 11 files
+- **Total:** 20 documentation files
 
 ### Total Word Count
-- **Approximate:** 55,000+ words
-- **Reading Time:** 9-11 hours for complete documentation
+- **Approximate:** 75,000+ words
+- **Reading Time:** 12-15 hours for complete documentation
 
 ### Last Updated
 - **Initial Creation:** January 2025
-- **Last Major Update:** January 8, 2025 (Messenger feature, dropdown fix)
+- **Last Major Update:** October 10, 2025 (AI Auto-Responder, complete Messenger & N8N docs)
 - **Update Frequency:** After each major feature release
 
 ---

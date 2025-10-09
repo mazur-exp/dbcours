@@ -23,6 +23,8 @@ create_table "users", force: :cascade do |t|
   t.boolean "authenticated", default: false
   t.datetime "created_at", null: false
   t.datetime "updated_at", null: false
+  t.boolean "admin", default: false, null: false      # Added 2025-10-08
+  t.string "avatar_url"                               # Added 2025-10-08
   t.index ["session_token"], name: "index_users_on_session_token", unique: true
   t.index ["telegram_id"], name: "index_users_on_telegram_id", unique: true
 end
@@ -39,6 +41,8 @@ end
 | `last_name` | string | YES | NULL | User's last name from Telegram (may be null) |
 | `session_token` | string | YES | NULL | Temporary token for auth flow (32-char hex) |
 | `authenticated` | boolean | NO | false | Whether user has completed auth |
+| `admin` | boolean | NO | false | **NEW:** Admin flag for messenger access |
+| `avatar_url` | string | YES | NULL | **NEW:** Telegram profile photo URL |
 | `created_at` | datetime | NO | now() | Record creation timestamp |
 | `updated_at` | datetime | NO | now() | Record last update timestamp |
 
@@ -50,30 +54,293 @@ end
 - `telegram_id` must be unique and not null
 - `session_token` must be unique if present
 
+**New Fields (Added 2025-10-08):**
+
+- **`admin`** - Boolean flag for admin dashboard access
+  - Purpose: Controls access to `/messenger` admin interface
+  - Usage: `@current_user.admin?` in controllers
+  - Set manually in console: `user.update(admin: true)`
+
+- **`avatar_url`** - Telegram profile photo URL
+  - Purpose: Display user avatars in messenger interface
+  - Format: `https://api.telegram.org/file/bot{token}/{file_path}`
+  - Fetched from Telegram API during auth
+  - Updated periodically (daily) for active users
+  - Fallback: Show initials if avatar_url is nil
+
 ---
 
 ## User Model
 
 **File:** `app/models/user.rb`
 
-**Validations:**
+**Associations:**
 ```ruby
 class User < ApplicationRecord
-  validates :telegram_id, presence: true, uniqueness: true
-  validates :session_token, uniqueness: true, allow_nil: true
+  has_many :conversations, dependent: :destroy
+  has_many :messages
 end
 ```
 
-**Methods (Current):**
+**Scopes:**
 ```ruby
-# Example custom method (not yet implemented)
-def display_name
-  first_name || username || "User #{telegram_id}"
+scope :admins, -> { where(admin: true) }
+scope :authenticated_users, -> { where(authenticated: true) }
+```
+
+**Methods:**
+```ruby
+# Get or create conversation for this user
+def conversation
+  conversations.first_or_create!
 end
 
-def enrolled?
-  # Future: Check enrollment record
-  false
+# Full name (first + last)
+def full_name
+  [first_name, last_name].compact.join(' ').presence || 'Пользователь'
+end
+
+# Count of sent messages
+def messages_count
+  conversation&.messages&.where(direction: :incoming)&.count || 0
+end
+```
+
+---
+
+### Conversations Table
+
+**Purpose:** Group messages by user for messenger feature
+
+**Schema:**
+```ruby
+create_table "conversations", force: :cascade do |t|
+  t.integer "user_id", null: false
+  t.datetime "last_message_at"
+  t.integer "unread_count", default: 0
+  t.datetime "created_at", null: false
+  t.datetime "updated_at", null: false
+  t.string "ai_real_name"                # Added 2025-10-09
+  t.text "ai_background"                 # Added 2025-10-09
+  t.text "ai_query"                      # Added 2025-10-09
+  t.integer "ai_ready_score"             # Added 2025-10-09
+  t.boolean "ai_processing", default: false  # Added 2025-10-09
+  t.index ["last_message_at"], name: "index_conversations_on_last_message_at"
+  t.index ["user_id"], name: "index_conversations_on_user_id"
+end
+
+add_foreign_key "conversations", "users"
+```
+
+**Field Descriptions:**
+
+| Field | Type | Null | Default | Description |
+|-------|------|------|---------|-------------|
+| `id` | integer | NO | auto | Primary key |
+| `user_id` | integer | NO | - | Foreign key to users table |
+| `last_message_at` | datetime | YES | NULL | Timestamp of last message (for sorting) |
+| `unread_count` | integer | NO | 0 | Cached count of unread incoming messages |
+| `ai_real_name` | string | YES | NULL | **AI-extracted:** User's real name |
+| `ai_background` | text | YES | NULL | **AI-extracted:** User's business context |
+| `ai_query` | text | YES | NULL | **AI-extracted:** Main question/intent |
+| `ai_ready_score` | integer | YES | NULL | **AI-extracted:** Lead readiness (0-100) |
+| `ai_processing` | boolean | NO | false | **AI flag:** Typing indicator active |
+| `created_at` | datetime | NO | now() | Record creation timestamp |
+| `updated_at` | datetime | NO | now() | Record last update timestamp |
+
+**Indexes:**
+- `user_id` - Fast lookup of user's conversation
+- `last_message_at` - Fast sorting of conversation list
+
+**AI Qualification Fields (Added 2025-10-09):**
+
+These fields enable automatic lead qualification during AI-powered conversations:
+
+- **`ai_real_name`** - User's real name extracted by AI
+  - Example: "Hi, I'm Alex" → `ai_real_name = "Alex"`
+  - Used for personalization and CRM integration
+
+- **`ai_background`** - Business context/situation
+  - Example: "I own 3 restaurants in Moscow" → `ai_background = "Restaurant owner, 3 locations, Moscow"`
+  - Used for lead segmentation and sales strategy
+
+- **`ai_query`** - Main question or goal identified
+  - Example: "How much to start food delivery?" → `ai_query = "Cost of starting delivery business"`
+  - Used for analytics and FAQ optimization
+
+- **`ai_ready_score`** - Lead readiness score (0-100)
+  - 0-30: Just exploring, no urgency
+  - 31-60: Interested, gathering info
+  - 61-85: Serious buyer, evaluating options
+  - 86-100: Ready to purchase
+  - Used for lead prioritization
+
+- **`ai_processing`** - Technical flag for typing indicator
+  - `true` = AI analyzing message, show typing indicator
+  - `false` = AI finished, stop typing indicator
+  - Controls `TypingIndicatorJob` loop
+
+**Constraints:**
+- One conversation per user (enforced by application logic)
+- Foreign key to users table (cascade delete)
+
+---
+
+## Conversation Model
+
+**File:** `app/models/conversation.rb`
+
+**Associations:**
+```ruby
+class Conversation < ApplicationRecord
+  belongs_to :user
+  has_many :messages, dependent: :destroy
+end
+```
+
+**Scopes:**
+```ruby
+scope :recent, -> { order(last_message_at: :desc) }
+scope :with_unread, -> { where('unread_count > 0') }
+```
+
+**Methods:**
+```ruby
+# Get last message
+def last_message
+  messages.order(created_at: :desc).first
+end
+
+# Update last_message_at timestamp
+def touch_last_message!
+  update!(last_message_at: Time.current)
+end
+
+# Increment unread counter
+def increment_unread!
+  increment!(:unread_count)
+end
+
+# Mark all messages as read
+def mark_all_read!
+  update!(unread_count: 0)
+  messages.where(read: false).update_all(read: true)
+end
+```
+
+---
+
+### Messages Table
+
+**Purpose:** Store individual messages in conversations
+
+**Schema:**
+```ruby
+create_table "messages", force: :cascade do |t|
+  t.integer "conversation_id", null: false
+  t.integer "user_id"
+  t.text "body", null: false
+  t.integer "direction", default: 0, null: false
+  t.bigint "telegram_message_id"
+  t.boolean "read", default: false
+  t.datetime "created_at", null: false
+  t.datetime "updated_at", null: false
+  t.index ["conversation_id", "created_at"], name: "index_messages_on_conversation_id_and_created_at"
+  t.index ["conversation_id"], name: "index_messages_on_conversation_id"
+  t.index ["telegram_message_id"], name: "index_messages_on_telegram_message_id"
+  t.index ["user_id"], name: "index_messages_on_user_id"
+end
+
+add_foreign_key "messages", "conversations"
+add_foreign_key "messages", "users"
+```
+
+**Field Descriptions:**
+
+| Field | Type | Null | Default | Description |
+|-------|------|------|---------|-------------|
+| `id` | integer | NO | auto | Primary key |
+| `conversation_id` | integer | NO | - | Parent conversation |
+| `user_id` | integer | YES | NULL | Sender (NULL for admin/AI messages) |
+| `body` | text | NO | - | Message text content |
+| `direction` | integer | NO | 0 | Enum: 0=incoming, 1=outgoing |
+| `telegram_message_id` | bigint | YES | NULL | Telegram API message ID |
+| `read` | boolean | NO | false | Whether admin has read the message |
+| `created_at` | datetime | NO | now() | Message creation timestamp |
+| `updated_at` | datetime | NO | now() | Message update timestamp |
+
+**Direction Enum:**
+- `0` (incoming) - Message from user to admin
+- `1` (outgoing) - Message from admin/AI to user
+
+**Indexes:**
+- `conversation_id` - Fast lookup of conversation messages
+- `conversation_id + created_at` - Fast chronological sorting
+- `telegram_message_id` - Fast lookup by Telegram ID
+- `user_id` - Fast lookup of user's sent messages
+
+**Constraints:**
+- `body` must not be null (text required)
+- `direction` must be 0 or 1
+- Foreign keys to conversations and users
+
+---
+
+## Message Model
+
+**File:** `app/models/message.rb`
+
+**Associations:**
+```ruby
+class Message < ApplicationRecord
+  belongs_to :conversation
+  belongs_to :user, optional: true  # nullable for admin messages
+end
+```
+
+**Enum:**
+```ruby
+enum :direction, { incoming: 0, outgoing: 1 }
+```
+
+**Validations:**
+```ruby
+validates :body, presence: true
+validates :direction, presence: true
+```
+
+**Scopes:**
+```ruby
+scope :unread, -> { where(read: false) }
+scope :by_time, -> { order(created_at: :asc) }
+```
+
+**Methods:**
+```ruby
+# Check if message is from admin
+def from_admin?
+  outgoing? && user_id.nil?
+end
+
+# Check if message is from user
+def from_user?
+  incoming? && user_id.present?
+end
+```
+
+**Callbacks:**
+```ruby
+after_create :update_conversation_timestamp
+after_create :increment_conversation_unread, if: :incoming?
+
+private
+
+def update_conversation_timestamp
+  conversation.touch_last_message!
+end
+
+def increment_conversation_unread
+  conversation.increment_unread!
 end
 ```
 

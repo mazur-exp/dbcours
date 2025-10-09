@@ -235,6 +235,420 @@ OR
 
 ---
 
+## Messenger Endpoints (Admin Dashboard)
+
+**Base Path:** `/messenger`
+
+**Authentication:** Admin-only (before_action: require_admin)
+
+**Authorization Check:**
+```ruby
+def require_admin
+  unless @current_user&.admin?
+    redirect_to root_path, alert: 'Access denied'
+  end
+end
+```
+
+---
+
+### GET /messenger
+
+**Purpose:** Admin messenger dashboard
+
+**Authentication:** Admin required
+
+**Parameters:**
+- `conversation_id` (optional) - ID of conversation to display
+
+**Request:**
+```http
+GET /messenger?conversation_id=5
+```
+
+**Response:** HTML page with:
+- Left sidebar: List of conversations (sorted by last_message_at)
+- Right panel: Active conversation messages + input form
+- Real-time updates via ActionCable (MessengerChannel)
+
+**Side Effects:**
+- Marks all messages in active conversation as read
+- Updates unread_count to 0
+
+**Example Response Structure:**
+```erb
+<div class="messenger-container">
+  <!-- Left: Conversations list -->
+  <aside>
+    <% @conversations.each do |conv| %>
+      <!-- Conversation card with avatar, last message, unread badge -->
+    <% end %>
+  </aside>
+
+  <!-- Right: Active conversation -->
+  <main data-controller="messenger">
+    <!-- Header with user info + delete button -->
+    <!-- Messages list (scrollable) -->
+    <!-- Input form -->
+  </main>
+</div>
+```
+
+---
+
+### GET /messenger/conversations/:id/messages
+
+**Purpose:** Fetch messages for a conversation (AJAX)
+
+**Authentication:** Admin required
+
+**Parameters:**
+- `:id` - Conversation ID
+
+**Request:**
+```http
+GET /messenger/conversations/5/messages
+```
+
+**Response:**
+```json
+{
+  "messages": [
+    {
+      "id": 123,
+      "body": "Hello!",
+      "direction": "incoming",
+      "created_at": "2025-10-10T14:30:00Z",
+      "read": true,
+      "telegram_message_id": 456789,
+      "user": {
+        "id": 12,
+        "first_name": "John",
+        "last_name": "Doe",
+        "username": "johndoe",
+        "avatar_url": "https://..."
+      }
+    },
+    {
+      "id": 124,
+      "body": "How can I help?",
+      "direction": "outgoing",
+      "created_at": "2025-10-10T14:31:00Z",
+      "read": true,
+      "user": null
+    }
+  ],
+  "user": {
+    "id": 12,
+    "first_name": "John",
+    "last_name": "Doe",
+    "username": "johndoe",
+    "avatar_url": "https://...",
+    "created_at": "2025-10-08T10:00:00Z"
+  }
+}
+```
+
+**Status Codes:**
+- `200 OK` - Messages fetched successfully
+- `401 Unauthorized` - Not admin
+- `404 Not Found` - Conversation doesn't exist
+
+---
+
+### POST /messenger/conversations/:id/messages
+
+**Purpose:** Send message to user via Telegram
+
+**Authentication:** Admin required
+
+**Parameters:**
+- `:id` - Conversation ID
+
+**Request:**
+```http
+POST /messenger/conversations/5/messages
+Content-Type: application/json
+X-CSRF-Token: <token>
+
+{
+  "body": "Thank you for your question! Here's how..."
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": {
+    "id": 125,
+    "body": "Thank you for your question! Here's how...",
+    "direction": "outgoing",
+    "created_at": "2025-10-10T14:32:00Z",
+    "telegram_message_id": 456790,
+    "read": true,
+    "user_id": null
+  }
+}
+```
+
+**Status Codes:**
+- `200 OK` - Message sent successfully
+- `401 Unauthorized` - Not admin
+- `404 Not Found` - Conversation doesn't exist
+- `422 Unprocessable Entity` - Message body blank or Telegram API error
+
+**Side Effects:**
+- Sends message via Telegram Bot API to user
+- Saves message to database (direction: outgoing)
+- Broadcasts to MessengerChannel (all admin sessions see update)
+- Updates conversation last_message_at timestamp
+
+**Error Handling:**
+- If Telegram API fails → returns 422 with error message
+- Message not saved if Telegram API fails
+
+---
+
+### PATCH /messenger/conversations/:id/mark_read
+
+**Purpose:** Mark all messages in conversation as read
+
+**Authentication:** Admin required
+
+**Parameters:**
+- `:id` - Conversation ID
+
+**Request:**
+```http
+PATCH /messenger/conversations/5/mark_read
+X-CSRF-Token: <token>
+```
+
+**Response:**
+```json
+{
+  "success": true
+}
+```
+
+**Status Codes:**
+- `200 OK` - Messages marked as read
+- `401 Unauthorized` - Not admin
+- `404 Not Found` - Conversation doesn't exist
+
+**Side Effects:**
+- Sets `read = true` for all incoming messages in conversation
+- Sets `unread_count = 0` for conversation
+- No ActionCable broadcast (automatic on page view)
+
+---
+
+### DELETE /messenger/users/:id
+
+**Purpose:** Delete user and all associated data
+
+**Authentication:** Admin required
+
+**Parameters:**
+- `:id` - User ID
+
+**Request:**
+```http
+DELETE /messenger/users/12
+X-CSRF-Token: <token>
+```
+
+**Response:** Redirect to `/messenger` with notice
+
+**Status Codes:**
+- `302 Found` - Redirect to messenger page
+- `401 Unauthorized` - Not admin
+
+**Side Effects:**
+- Deletes user record
+- Cascades delete to conversations (dependent: :destroy)
+- Cascades delete to all messages in conversations
+- Cannot delete self (safety check)
+- Shows confirmation modal before delete (data-confirm)
+
+**Confirmation Dialog:**
+```erb
+<%= button_to "Delete User", messenger_delete_user_path(@user),
+    method: :delete,
+    data: { confirm: "Are you sure? This will delete all messages and user data." },
+    class: "..." %>
+```
+
+---
+
+## N8N API Endpoints (Webhook Integration)
+
+**Base Path:** `/api/n8n`
+
+**Authentication:** Bearer token (currently disabled, TODO: enable in production)
+
+**Purpose:** Allow N8N workflows (and AI) to send messages back to users
+
+---
+
+### POST /api/n8n/send_message
+
+**Purpose:** Send message to user via Telegram (called by N8N/AI workflows)
+
+**Authentication:** Bearer token (N8N_API_TOKEN) - **CURRENTLY DISABLED**
+
+**Request:**
+```http
+POST /api/n8n/send_message
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+
+{
+  "telegram_id": 987654321,
+  "text": "**Great question!** The course costs $199...\n\nHere's what you get:\n• Module 1\n• Module 2"
+}
+```
+
+**Request Fields:**
+- `telegram_id` (required) - User's Telegram ID
+- `text` (required) - Message text (supports Markdown)
+
+**Markdown Support:**
+- `**bold**` → bold
+- `*italic*` → italic
+- `` `code` `` → code
+- `[text](url)` → links
+- `\n` → line breaks
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "message_id": 126,
+  "telegram_message_id": 456791,
+  "user_id": 12,
+  "conversation_id": 5
+}
+```
+
+**Response (Error - User not found):**
+```json
+{
+  "error": "User not found"
+}
+```
+
+**Response (Error - Missing parameter):**
+```json
+{
+  "error": "telegram_id is required"
+}
+```
+
+**Status Codes:**
+- `200 OK` - Message sent successfully
+- `401 Unauthorized` - Invalid Bearer token (when enabled)
+- `404 Not Found` - User not found
+- `422 Unprocessable Entity` - Missing required parameters
+- `500 Internal Server Error` - Telegram API failed
+
+**AI Response Parsing:**
+
+The endpoint intelligently parses AI responses that may include JSON:
+
+**Format 1: JSON code block**
+```
+```json
+{
+  "output": "Your message here",
+  "real_name": "Alex",
+  "background": "Restaurant owner",
+  "query": "Course pricing",
+  "ready": 85
+}
+```
+```
+
+**Format 2: Plain JSON**
+```json
+{
+  "output": "Your message here",
+  "ready": 85
+}
+```
+
+**Format 3: Plain text (fallback)**
+```
+Just plain text, no JSON
+```
+
+**Parsed Fields:**
+- `output` (required) - Message text sent to user
+- `real_name` (optional) - User's real name → saved to conversation.ai_real_name
+- `background` (optional) - Business context → saved to conversation.ai_background
+- `query` (optional) - Main question → saved to conversation.ai_query
+- `ready` (optional) - Readiness score 0-100 → saved to conversation.ai_ready_score
+
+**Side Effects:**
+- Sends message to user via Telegram API
+- Saves message to database (direction: outgoing, user_id: nil)
+- **Stops typing indicator** - Sets conversation.ai_processing = false
+- Saves AI qualification data to conversation
+- Broadcasts to MessengerChannel (admin sees message in real-time)
+- Updates conversation last_message_at timestamp
+
+**Error Handling:**
+
+1. **Markdown parse error** - Retries without Markdown
+2. **JSON parse error** - Treats entire text as plain message
+3. **User not found** - Returns 404, no message saved
+4. **Telegram API error** - Returns 500, no message saved
+
+**Example N8N Workflow Configuration:**
+
+```javascript
+// N8N HTTP Request node
+{
+  "method": "POST",
+  "url": "https://your-domain.com/api/n8n/send_message",
+  "headers": {
+    "Authorization": "Bearer {{$env.N8N_API_TOKEN}}",
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "telegram_id": "{{$json.user.telegram_id}}",
+    "text": "{{$json.ai_response}}"
+  }
+}
+```
+
+**Security Note:**
+
+Currently authentication is **DISABLED** for testing:
+
+```ruby
+# app/controllers/n8n_controller.rb
+skip_before_action :verify_authenticity_token
+# TODO: Добавить авторизацию позже когда всё заработает
+# before_action :verify_n8n_token
+```
+
+**Production Implementation Required:**
+
+```ruby
+before_action :verify_n8n_token
+
+def verify_n8n_token
+  token = request.headers['Authorization']&.split(' ')&.last
+  unless token == N8N_API_TOKEN
+    render json: { error: 'Unauthorized' }, status: :unauthorized
+  end
+end
+```
+
+---
+
 ## Future Endpoints (Planned)
 
 ### POST /enrollments
