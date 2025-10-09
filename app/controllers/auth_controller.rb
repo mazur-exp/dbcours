@@ -298,6 +298,15 @@ class AuthController < ApplicationController
     # Reload conversation для получения актуального last_message_at и unread_count
     conversation.reload
 
+    # Устанавливаем флаг что AI обрабатывает сообщение
+    conversation.update!(ai_processing: true)
+
+    # Отправляем первый typing indicator сразу
+    send_typing_action(telegram_id)
+
+    # Запускаем фоновую задачу для продолжения typing индикатора
+    TypingIndicatorJob.set(wait: 4.seconds).perform_later(conversation.id)
+
     # Отправляем сообщение на N8N
     send_message_to_n8n(msg, user, conversation)
 
@@ -393,6 +402,18 @@ class AuthController < ApplicationController
 
     # Объединяем все сообщения с переносами строк
     formatted_messages.join("\n")
+  end
+
+  def send_typing_action(telegram_id)
+    begin
+      bot_client.api.send_chat_action(
+        chat_id: telegram_id,
+        action: 'typing'
+      )
+      Rails.logger.info "Typing action sent to telegram_id=#{telegram_id}"
+    rescue => e
+      Rails.logger.error "Failed to send typing action: #{e.message}"
+    end
   end
 
   def bot_client

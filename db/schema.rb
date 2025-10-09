@@ -10,13 +10,18 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_10_08_071859) do
+ActiveRecord::Schema[8.0].define(version: 2025_10_09_163441) do
   create_table "conversations", force: :cascade do |t|
     t.integer "user_id", null: false
     t.datetime "last_message_at"
     t.integer "unread_count", default: 0
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "ai_real_name"
+    t.text "ai_background"
+    t.text "ai_query"
+    t.integer "ai_ready_score"
+    t.boolean "ai_processing", default: false
     t.index ["last_message_at"], name: "index_conversations_on_last_message_at"
     t.index ["user_id"], name: "index_conversations_on_user_id"
   end

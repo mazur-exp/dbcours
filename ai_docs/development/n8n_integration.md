@@ -482,6 +482,226 @@ Response:
 
 ---
 
+## 🔄 Bi-directional Integration (Rails ↔ N8N)
+
+### Incoming Webhook (Rails → N8N) ✅ IMPLEMENTED
+
+Описано выше в секции "Message Received". Rails отправляет события в N8N.
+
+---
+
+### Outgoing API (N8N → Rails) ✅ IMPLEMENTED
+
+**Endpoint:** `POST /api/n8n/send_message`
+
+**Purpose:** Позволяет N8N (или AI-workflow) отправлять сообщения клиентам через Telegram Bot
+
+**Authentication:** Bearer token (N8N_API_TOKEN)
+
+**Request Format:**
+
+```http
+POST https://your-domain.com/api/n8n/send_message
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+
+{
+  "telegram_id": 1978625688,
+  "text": "**Привет!** Вот ответ на ваш вопрос:\n\n• Пункт 1\n• Пункт 2\n\nПодробнее: [ссылка](https://example.com)"
+}
+```
+
+**Fields:**
+- `telegram_id` (required) - Telegram user ID клиента
+- `text` (required) - Текст сообщения в Markdown формате
+
+**Markdown Support:**
+- `**bold**` → **bold**
+- `*italic*` → *italic*
+- `` `code` `` → `code`
+- `[text](url)` → links
+- `• List items` → bullet lists
+- `\n` → переносы строк
+
+**Response (Success):**
+
+```json
+{
+  "success": true,
+  "message_id": 169,
+  "telegram_message_id": 452,
+  "user_id": 15,
+  "conversation_id": 8
+}
+```
+
+**Response (Error):**
+
+```json
+{
+  "error": "User not found"
+}
+```
+
+**Status Codes:**
+- `200` - Success
+- `401` - Unauthorized (invalid Bearer token)
+- `404` - User not found
+- `422` - Missing required parameters
+- `500` - Internal server error (Telegram API failed)
+
+---
+
+### N8N Workflow: AI Auto-Responder (Full Cycle)
+
+**Complete Flow:**
+
+```
+1. User sends message in Telegram
+   ↓
+2. Telegram → Rails webhook (/auth/telegram/webhook)
+   ↓
+3. Rails → N8N webhook (message_received event)
+   Payload includes: message text + conversation_history (last 50)
+   ↓
+4. N8N → OpenAI/Claude API
+   Prompt: "Analyze conversation history and respond as sales consultant"
+   ↓
+5. AI generates Markdown-formatted response
+   ↓
+6. N8N → Rails API (POST /api/n8n/send_message)
+   {
+     "telegram_id": 1978625688,
+     "text": "**Отличный вопрос!** Вот что я могу порекомендовать..."
+   }
+   ↓
+7. Rails → Telegram Bot API (send_message with Markdown)
+   ↓
+8. User receives AI response in Telegram
+   ↓
+9. Rails → ActionCable broadcast
+   ↓
+10. Admin sees AI response in messenger dashboard
+```
+
+**N8N Nodes Configuration:**
+
+1. **Webhook Trigger** - receives `message_received` from Rails
+2. **Function Node** - extract `conversation_history` and `text`
+3. **OpenAI/Claude Node** - AI analysis and response generation
+   - Model: GPT-4 or Claude Sonnet
+   - System prompt: Sales consultant instructions
+   - Include: conversation_history for context
+4. **HTTP Request Node** - POST to Rails `/api/n8n/send_message`
+   - Method: POST
+   - URL: `{{$env.RAILS_URL}}/api/n8n/send_message`
+   - Headers:
+     - `Authorization: Bearer {{$env.N8N_API_TOKEN}}`
+     - `Content-Type: application/json`
+   - Body:
+     ```json
+     {
+       "telegram_id": {{$json.user.telegram_id}},
+       "text": {{$json.ai_response}}
+     }
+     ```
+5. **Airtable/Database Node** (optional) - log AI interactions
+
+**Example AI Prompt:**
+
+```
+You are a sales consultant for Bali Food Delivery Master course.
+
+Conversation History:
+{{$json.conversation_history}}
+
+Customer's latest message: {{$json.text}}
+
+Customer Info:
+- Name: {{$json.user.first_name}}
+- Business stage: [extract from history]
+
+Instructions:
+- Use consultative selling (70% value, 30% qualification)
+- Apply "Value First" principle
+- Show empathy to objections
+- Recommend appropriate tier (Базовый/Акселератор/VIP)
+- Use Markdown formatting for better readability
+- Keep response concise (2-3 paragraphs max)
+
+Response (in Markdown):
+```
+
+**Benefits:**
+- **Context-aware AI** - sees full conversation history
+- **Markdown formatting** - professional, readable messages
+- **Automatic sales** - qualifies and closes leads 24/7
+- **Admin oversight** - all messages visible in dashboard
+- **Fallback to human** - admin can jump in anytime
+
+---
+
+### API Usage Examples
+
+**Send simple message:**
+
+```bash
+curl -X POST https://your-domain.com/api/n8n/send_message \
+  -H 'Authorization: Bearer YOUR_N8N_API_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "telegram_id": 1978625688,
+    "text": "Спасибо за вопрос! Проверяю информацию..."
+  }'
+```
+
+**Send Markdown-formatted message:**
+
+```bash
+curl -X POST https://your-domain.com/api/n8n/send_message \
+  -H 'Authorization: Bearer YOUR_N8N_API_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "telegram_id": 1978625688,
+    "text": "**Акселератор тариф** включает:\n\n• 5 модулей видео\n• 3 живых воркшопа\n• 60 дней поддержки\n\n*Цена:* ₽38,000\n\nПодробнее: [тарифы](/pricing)"
+  }'
+```
+
+**From N8N (HTTP Request node):**
+
+```javascript
+// N8N Function node to format request
+return {
+  json: {
+    telegram_id: $input.item.json.user.telegram_id,
+    text: $input.item.json.ai_response // AI-generated Markdown text
+  }
+}
+```
+
+---
+
+### Error Handling
+
+**Invalid Markdown fallback:**
+
+If Telegram API returns Markdown parse error, the endpoint automatically:
+1. Logs the error
+2. Retries sending as plain text
+3. Returns success with warning
+
+**Example:**
+
+```json
+{
+  "success": true,
+  "message_id": 170,
+  "warning": "Markdown parse error, sent as plain text"
+}
+```
+
+---
+
 ## Security
 
 ### Authentication

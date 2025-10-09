@@ -33,4 +33,7 @@ Rails.application.routes.draw do
   get "auth/check_token", to: "auth#check_token"
   post "auth/set_session", to: "auth#set_session"
   delete "auth/logout", to: "auth#logout", as: :auth_logout
+
+  # N8N API routes
+  post "api/n8n/send_message", to: "n8n#send_message", as: :n8n_send_message
 end
