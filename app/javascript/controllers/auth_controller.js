@@ -209,20 +209,20 @@ export default class extends Controller {
     const username = user.username ? `@${user.username}` : ''
 
     container.innerHTML = `
-      <div class="relative" data-authenticated="true">
+      <div class="relative" data-authenticated="true" data-controller="dropdown">
         <!-- Кнопка-триггер dropdown -->
-        <button onclick="toggleUserDropdown()" class="bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-1.5 px-3 rounded-lg transition-all flex items-center gap-2 text-sm">
+        <button data-action="click->dropdown#toggle" class="bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-1.5 px-3 rounded-lg transition-all flex items-center gap-2 text-sm">
           <div class="w-7 h-7 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-xs">
             ${firstLetter}
           </div>
           <span>${user.first_name || 'Профиль'}</span>
-          <svg class="w-3.5 h-3.5 transition-transform text-gray-500" id="dropdown-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-3.5 h-3.5 transition-transform text-gray-500" data-dropdown-target="chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
           </svg>
         </button>
 
         <!-- Dropdown меню -->
-        <div id="user-dropdown" class="hidden absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden z-50">
+        <div data-dropdown-target="menu" class="hidden absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden z-50">
           <!-- Заголовок профиля -->
           <div class="px-4 py-3 bg-gradient-to-r from-blue-50 to-blue-100 border-b border-blue-200">
             <div class="flex items-center gap-3">

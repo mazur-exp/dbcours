@@ -259,9 +259,28 @@ ai_docs/
 - Issue #3: Mobile browser auth stuck (API polling solution)
 - Issue #4: Content accessible without auth (page load check solution)
 - Issue #5: Blur on wrong elements (targeted wrapper solution)
+- Issue #10: Dropdown menu not working after page refresh (Stimulus controller solution)
 - Plus 4 more documented issues
 
 **Use When:** Debugging similar issues, understanding past decisions, preventing regressions
+
+---
+
+### 9. messenger_feature.md
+**Purpose:** Complete real-time messenger implementation documentation
+
+**Contents:**
+- Architecture overview (backend, frontend, WebSocket)
+- Database schema (conversations, messages)
+- Request flow (incoming/outgoing messages)
+- Real-time avatar display implementation
+- Admin features (user management, mark as read)
+- WebSocket architecture (MessengerChannel)
+- UI components (conversation list, message thread)
+- Security considerations
+- Future enhancements (rich media, search, templates)
+
+**Use When:** Understanding messenger functionality, debugging real-time features, extending messaging capabilities
 
 ---
 
@@ -374,15 +393,16 @@ ai_docs/
 ### File Count
 - **Business:** 5 files
 - **UI:** 4 files
-- **Development:** 8 files
-- **Total:** 17 documentation files
+- **Development:** 9 files
+- **Total:** 18 documentation files
 
 ### Total Word Count
-- **Approximate:** 50,000+ words
-- **Reading Time:** 8-10 hours for complete documentation
+- **Approximate:** 55,000+ words
+- **Reading Time:** 9-11 hours for complete documentation
 
 ### Last Updated
 - **Initial Creation:** January 2025
+- **Last Major Update:** January 8, 2025 (Messenger feature, dropdown fix)
 - **Update Frequency:** After each major feature release
 
 ---

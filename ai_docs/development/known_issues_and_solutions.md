@@ -547,6 +547,184 @@ asset_path: /rails/public/assets
 
 ---
 
+## Issue #10: Dropdown Menu Not Working After Page Refresh on Messenger
+
+### Problem
+
+**Symptom:**
+- User navigates to `/messenger` page
+- User dropdown menu (avatar/username dropdown) works initially
+- After refreshing the page (browser refresh or Turbo navigation)
+- Dropdown menu stops responding to clicks
+- JavaScript errors in console or menu simply doesn't open
+
+**Root Cause:**
+- Dropdown JavaScript event handlers were loaded via inline script in `_auth_script.html.erb`
+- This partial was only included on specific pages (free_lessons pages)
+- The `/messenger` page didn't include this partial
+- After page refresh, Turbo cached the page without the required JavaScript handlers
+- Dropdown relied on global functions (`toggleUserDropdown()`) that weren't available
+
+**Original Implementation:**
+```javascript
+// In _auth_script.html.erb (only loaded on certain pages)
+function toggleUserDropdown() {
+  const dropdown = document.getElementById('user-dropdown');
+  dropdown.classList.toggle('hidden');
+}
+
+// In _auth_button.html.erb
+<button id="user-dropdown-trigger" onclick="toggleUserDropdown()">
+  <!-- User info -->
+</button>
+```
+
+**Why it Failed:**
+- Inline `onclick` handlers require global functions
+- Global functions weren't defined on messenger page
+- Turbo cache didn't preserve dynamically-added event listeners
+- Not compatible with Turbo Drive's page transition model
+
+---
+
+### Solution
+
+**Stimulus Controller Pattern (Rails 8 Best Practice):**
+
+**Created New File:** `app/javascript/controllers/dropdown_controller.js`
+
+```javascript
+import { Controller } from "@hotwired/stimulus"
+
+export default class extends Controller {
+  static targets = ["menu", "chevron"]
+
+  connect() {
+    // Bind event listener for clicking outside
+    this.boundCloseOnClickOutside = this.closeOnClickOutside.bind(this)
+    this.boundCloseOnEscape = this.closeOnEscape.bind(this)
+  }
+
+  disconnect() {
+    // Clean up event listeners when controller is removed
+    document.removeEventListener('click', this.boundCloseOnClickOutside)
+    document.removeEventListener('keydown', this.boundCloseOnEscape)
+  }
+
+  toggle(event) {
+    event.stopPropagation() // Prevent immediate close from document click
+
+    const isHidden = this.menuTarget.classList.contains('hidden')
+
+    if (isHidden) {
+      this.open()
+    } else {
+      this.close()
+    }
+  }
+
+  open() {
+    this.menuTarget.classList.remove('hidden')
+    if (this.hasChevronTarget) {
+      this.chevronTarget.classList.add('rotate-180')
+    }
+
+    // Add listeners after small delay to prevent immediate close
+    setTimeout(() => {
+      document.addEventListener('click', this.boundCloseOnClickOutside)
+      document.addEventListener('keydown', this.boundCloseOnEscape)
+    }, 10)
+  }
+
+  close() {
+    this.menuTarget.classList.add('hidden')
+    if (this.hasChevronTarget) {
+      this.chevronTarget.classList.remove('rotate-180')
+    }
+
+    // Remove listeners
+    document.removeEventListener('click', this.boundCloseOnClickOutside)
+    document.removeEventListener('keydown', this.boundCloseOnEscape)
+  }
+
+  closeOnClickOutside(event) {
+    if (!this.element.contains(event.target)) {
+      this.close()
+    }
+  }
+
+  closeOnEscape(event) {
+    if (event.key === 'Escape') {
+      this.close()
+    }
+  }
+}
+```
+
+**Updated HTML Attributes in `_auth_button.html.erb`:**
+
+```erb
+<!-- Container with Stimulus controller -->
+<div data-controller="dropdown" class="relative">
+  <!-- Button with Stimulus action -->
+  <button
+    data-action="click->dropdown#toggle"
+    class="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+  >
+    <span><%= @current_user.first_name %></span>
+    <!-- Chevron target for rotation animation -->
+    <svg data-dropdown-target="chevron" class="w-4 h-4 transition-transform">
+      <!-- SVG path -->
+    </svg>
+  </button>
+
+  <!-- Dropdown menu with target -->
+  <div
+    data-dropdown-target="menu"
+    class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg"
+  >
+    <!-- Dropdown content -->
+  </div>
+</div>
+```
+
+**Updated Dynamic Dropdown Generation:**
+
+Both in `auth_controller.js` (line 212-225) and `_auth_script.html.erb` (line 339-353) to use Stimulus attributes instead of inline `onclick`:
+
+```javascript
+// Before: onclick="toggleUserDropdown()"
+// After: data-action="click->dropdown#toggle"
+
+// Before: id="user-dropdown"
+// After: data-dropdown-target="menu"
+
+// Before: id="dropdown-chevron"
+// After: data-dropdown-target="chevron"
+```
+
+**Removed Old Code:**
+
+Deleted ~60 lines of dropdown logic from `_auth_script.html.erb`:
+- `toggleUserDropdown()` function
+- `document.addEventListener('click')` for outside click
+- DOM ID-based element selection
+
+**Why it Works:**
+- Stimulus automatically connects/disconnects controllers on Turbo navigation
+- Data attributes (`data-controller`, `data-action`, `data-target`) work with Turbo cache
+- No reliance on global functions or manual event listener management
+- Event listener cleanup happens automatically via `disconnect()` lifecycle method
+- Works consistently across all pages (messenger, freecontent, home, dashboard)
+
+**Result:**
+- Dropdown now works on ALL pages after refresh
+- Compatible with Turbo Drive page transitions
+- Cleaner, more maintainable code following Rails 8 conventions
+- Automatic memory cleanup (no listener leaks)
+
+---
+
 ## Known Limitations (Not Issues)
 
 ### SQLite Concurrency

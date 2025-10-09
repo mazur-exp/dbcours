@@ -78,15 +78,19 @@ export default class extends Controller {
     const time = new Date(message.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
     const userName = message.user ? (message.user.first_name || 'U') : 'A'
     const userLetter = userName[0].toUpperCase()
+    const avatarUrl = message.user?.avatar_url
 
     if (isIncoming) {
+      // Создаём HTML для аватарки (либо изображение, либо инициалы)
+      const avatarHtml = avatarUrl
+        ? `<img src="${avatarUrl}" class="w-8 h-8 rounded-full object-cover flex-shrink-0" alt="${userName}" loading="lazy">`
+        : `<div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0">${userLetter}</div>`
+
       return `
         <div class="flex justify-start" data-message-id="${message.id}">
           <div class="max-w-xl">
             <div class="flex items-start gap-2">
-              <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
-                ${userLetter}
-              </div>
+              ${avatarHtml}
               <div class="flex-1">
                 <div class="bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
                   <p class="text-gray-900 whitespace-pre-wrap break-words">${this.escapeHtml(message.body)}</p>
@@ -139,6 +143,30 @@ export default class extends Controller {
   updateConversationElement(element, data) {
     const { user, last_message, unread_count } = data
 
+    // Обновляем аватарку если она есть
+    if (user && user.avatar_url) {
+      const avatarContainer = element.querySelector('.flex-shrink-0')
+      if (avatarContainer) {
+        // Проверяем, есть ли уже img или div с инициалами
+        const existingAvatar = avatarContainer.querySelector('img, div')
+        if (existingAvatar) {
+          // Если уже есть изображение, обновляем src
+          if (existingAvatar.tagName === 'IMG') {
+            existingAvatar.src = user.avatar_url
+          } else {
+            // Если был div с инициалами, заменяем на img
+            const userName = user.first_name || 'U'
+            const img = document.createElement('img')
+            img.src = user.avatar_url
+            img.alt = userName
+            img.className = 'w-12 h-12 rounded-full object-cover'
+            img.loading = 'lazy'
+            existingAvatar.replaceWith(img)
+          }
+        }
+      }
+    }
+
     // Обновляем текст последнего сообщения
     // Ищем оба варианта: с сообщением (.text-gray-600) и без ("Нет сообщений" .text-gray-400)
     let messageTextElement = element.querySelector('.text-sm.text-gray-600')
@@ -186,10 +214,59 @@ export default class extends Controller {
   }
 
   createConversationElement(data) {
-    // Создание нового элемента беседы для нового пользователя
-    // Проще всего перезагрузить страницу или использовать Turbo Frame
-    console.log('New conversation detected, would need to create element:', data)
-    // Для полной реализации можно создать HTML элемент вручную
+    console.log('Creating new conversation element:', data)
+
+    const { id, user, last_message, unread_count, last_message_at } = data
+
+    // Создаём аватарку или инициалы
+    const userLetter = (user.first_name || 'U')[0].toUpperCase()
+    const avatarHtml = user.avatar_url
+      ? `<img src="${user.avatar_url}" class="w-12 h-12 rounded-full object-cover" alt="${user.first_name}" loading="lazy">`
+      : `<div class="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-base">${userLetter}</div>`
+
+    // Форматируем время
+    const timeAgoText = last_message ? this.timeAgo(new Date(last_message.created_at)) + ' назад' : ''
+
+    // Форматируем текст последнего сообщения
+    const messagePrefix = last_message && last_message.direction === 'outgoing' ? '📤 Вы: ' : ''
+    const messageText = last_message
+      ? `<p class="text-sm text-gray-600 truncate">${messagePrefix}${this.escapeHtml(last_message.body)}</p>`
+      : `<p class="text-sm text-gray-400 italic">Нет сообщений</p>`
+
+    // Создаём HTML элемента
+    const conversationHtml = `
+      <div
+        class="hover:bg-gray-50 border-l-4 border-transparent cursor-pointer transition-colors"
+        data-conversation-id="${id}"
+        data-action="click->messenger#selectConversation"
+      >
+        <div class="p-4">
+          <div class="flex items-start gap-3">
+            <!-- Аватарка -->
+            <div class="flex-shrink-0">
+              ${avatarHtml}
+            </div>
+
+            <!-- Информация о чате -->
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between mb-1">
+                <h4 class="font-semibold text-gray-900 truncate">${this.escapeHtml(user.first_name + (user.last_name ? ' ' + user.last_name : ''))}</h4>
+                ${timeAgoText ? `<span class="text-xs text-gray-500 flex-shrink-0 ml-2">${timeAgoText}</span>` : ''}
+              </div>
+
+              ${messageText}
+
+              ${unread_count > 0 ? `<span class="inline-block mt-2 px-2 py-0.5 bg-blue-500 text-white text-xs font-bold rounded-full">${unread_count}</span>` : ''}
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+
+    // Вставляем в начало списка
+    this.conversationsListTarget.insertAdjacentHTML('afterbegin', conversationHtml)
+
+    console.log('New conversation element created and added to the list')
   }
 
   timeAgo(date) {

@@ -28,7 +28,7 @@ class MessengerController < ApplicationController
     @messages = @conversation.messages.by_time
     render json: {
       messages: @messages.as_json(include: :user),
-      user: @conversation.user.as_json(only: [:id, :first_name, :last_name, :username, :created_at])
+      user: @conversation.user.as_json(only: [:id, :first_name, :last_name, :username, :avatar_url, :created_at])
     }
   end
 
@@ -70,7 +70,7 @@ class MessengerController < ApplicationController
         message: message.as_json(include: :user),
         conversation: {
           id: @conversation.id,
-          user: @conversation.user.as_json(only: [:id, :first_name, :last_name, :username]),
+          user: @conversation.user.as_json(only: [:id, :first_name, :last_name, :username, :avatar_url]),
           last_message: message.as_json(only: [:id, :body, :direction, :created_at]),
           unread_count: @conversation.unread_count,
           last_message_at: @conversation.last_message_at

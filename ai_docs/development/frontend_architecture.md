@@ -62,6 +62,103 @@ The frontend uses a hybrid approach: server-side rendering for initial page load
 
 ---
 
+### Dropdown Controller
+
+**File:** `app/javascript/controllers/dropdown_controller.js`
+
+**Responsibilities:**
+- Handle dropdown menu toggle (user menu, settings, etc.)
+- Close dropdown on outside click
+- Close dropdown on ESC key press
+- Manage chevron rotation animation
+- Clean up event listeners on disconnect
+
+**Key Methods:**
+- `toggle(event)` - Opens/closes dropdown, prevents event bubbling
+- `open()` - Shows dropdown, adds global listeners
+- `close()` - Hides dropdown, removes global listeners
+- `closeOnClickOutside(event)` - Closes if click outside dropdown
+- `closeOnEscape(event)` - Closes on ESC key press
+
+**Lifecycle:**
+- `connect()` - Binds event handlers (called when controller attached to DOM)
+- `disconnect()` - Removes event listeners (called when controller removed from DOM)
+
+**Data Attributes:**
+```html
+<div data-controller="dropdown" class="relative">
+  <!-- Toggle button -->
+  <button data-action="click->dropdown#toggle">
+    <span>Username</span>
+    <svg data-dropdown-target="chevron" class="transition-transform">
+      <!-- Chevron icon -->
+    </svg>
+  </button>
+
+  <!-- Dropdown menu -->
+  <div data-dropdown-target="menu" class="hidden">
+    <!-- Menu items -->
+  </div>
+</div>
+```
+
+**Targets:**
+- `menu` - The dropdown content container (required)
+- `chevron` - The chevron icon for rotation animation (optional)
+
+**Why Stimulus Pattern vs. Global Functions:**
+- Works with Turbo Drive page caching
+- Automatic lifecycle management (connect/disconnect)
+- Scoped to component (no global namespace pollution)
+- Automatic cleanup prevents memory leaks
+- Compatible with dynamically-loaded content
+
+---
+
+### Messenger Controller
+
+**File:** `app/javascript/controllers/messenger_controller.js`
+
+**Responsibilities:**
+- Handle real-time message updates via WebSocket
+- Send messages to Telegram users
+- Update conversation list dynamically
+- Display user avatars in real-time
+- Scroll to new messages automatically
+
+**Key Methods:**
+- `connect()` - Subscribe to MessengerChannel WebSocket
+- `sendMessage(event)` - POST message to backend, send via Telegram API
+- `handleNewMessage(data)` - Render new message in chat
+- `updateConversationElement(data)` - Update conversation list with new message
+- `createMessageElement(message)` - Generate message HTML with avatar
+- `scrollToBottom()` - Auto-scroll chat to latest message
+
+**Data Attributes:**
+```html
+<div data-controller="messenger" data-messenger-conversation-id-value="123">
+  <!-- Message list -->
+  <div data-messenger-target="messageList">
+    <!-- Messages rendered here -->
+  </div>
+
+  <!-- Message form -->
+  <form data-action="submit->messenger#sendMessage">
+    <input data-messenger-target="input" type="text" />
+    <button type="submit">Send</button>
+  </form>
+</div>
+```
+
+**Targets:**
+- `messageList` - Container for messages
+- `input` - Message input field
+
+**Values:**
+- `conversationId` - Active conversation ID for WebSocket filtering
+
+---
+
 ## JavaScript Architecture
 
 ### Global Functions

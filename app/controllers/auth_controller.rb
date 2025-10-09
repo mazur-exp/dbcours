@@ -144,19 +144,60 @@ class AuthController < ApplicationController
         authenticated: true
       )
 
-      # Получаем и сохраняем аватарку
+      # Получаем и сохраняем аватарку (с повторной попыткой при неудаче)
       avatar_url = fetch_user_avatar(from["id"])
+      # Если не получили с первого раза - попробуем ещё раз через 1 секунду
+      if avatar_url.nil?
+        sleep(1)
+        avatar_url = fetch_user_avatar(from["id"])
+        Rails.logger.info "Retried fetching avatar for user #{from["id"]}, result: #{avatar_url.present? ? 'success' : 'failed'}"
+      end
       user.avatar_url = avatar_url if avatar_url
 
       if user.save
         # Отправляем успешное сообщение
         answer_callback_query(callback_query["id"], "✅ Авторизация успешна!")
-        send_success_message(chat_id, user)
 
-        # Сохраняем user_id в сессию (через Redis или другой механизм)
-        # Так как это webhook, сессии нет, используем broadcast для передачи user_id
+        # Текст приветственного сообщения
+        welcome_text = "✅ *Авторизация успешна!*\n\nДобро пожаловать, #{user.first_name}!\n\nТеперь вы можете вернуться на сайт и начать обучение. 🎓"
 
-        # Уведомляем браузер через ActionCable
+        # Отправляем сообщение в Telegram
+        telegram_result = send_success_message(chat_id, user)
+
+        # Создаём или получаем беседу для пользователя
+        conversation = user.conversation
+
+        # Сохраняем приветственное сообщение в БД как первое сообщение от админа
+        welcome_message = conversation.messages.create!(
+          body: welcome_text,
+          direction: :outgoing,
+          telegram_message_id: telegram_result&.message_id,
+          read: true,
+          user_id: nil # от админа
+        )
+
+        Rails.logger.info "Created conversation #{conversation.id} and welcome message #{welcome_message.id} for user #{user.id}"
+
+        # Reload conversation для получения актуального last_message_at
+        conversation.reload
+
+        # Broadcast через messenger_channel для появления чата у админа
+        ActionCable.server.broadcast("messenger_channel", {
+          type: "new_message",
+          conversation_id: conversation.id,
+          message: welcome_message.as_json(include: :user),
+          conversation: {
+            id: conversation.id,
+            user: user.as_json(only: [:id, :first_name, :last_name, :username, :avatar_url]),
+            last_message: welcome_message.as_json(only: [:id, :body, :direction, :created_at]),
+            unread_count: conversation.unread_count,
+            last_message_at: conversation.last_message_at
+          }
+        })
+
+        Rails.logger.info "Broadcasted new conversation #{conversation.id} to messenger_channel"
+
+        # Уведомляем браузер через ActionCable об успешной авторизации
         ActionCable.server.broadcast(
           "auth_channel_#{session_token}",
           {
@@ -209,11 +250,13 @@ class AuthController < ApplicationController
   end
 
   def send_success_message(chat_id, user)
-    bot_client.api.send_message(
+    result = bot_client.api.send_message(
       chat_id: chat_id,
       text: "✅ *Авторизация успешна!*\n\nДобро пожаловать, #{user.first_name}!\n\nТеперь вы можете вернуться на сайт и начать обучение. 🎓",
       parse_mode: "Markdown"
     )
+    Rails.logger.info "Success message sent to chat_id=#{chat_id}, message_id=#{result.message_id}"
+    result
   end
 
   def answer_callback_query(callback_query_id, text)
@@ -255,6 +298,9 @@ class AuthController < ApplicationController
     # Reload conversation для получения актуального last_message_at и unread_count
     conversation.reload
 
+    # Отправляем сообщение на N8N
+    send_message_to_n8n(msg, user, conversation)
+
     # Broadcast через ActionCable для real-time обновления
     ActionCable.server.broadcast("messenger_channel", {
       type: "new_message",
@@ -262,7 +308,7 @@ class AuthController < ApplicationController
       message: msg.as_json(include: :user),
       conversation: {
         id: conversation.id,
-        user: conversation.user.as_json(only: [:id, :first_name, :last_name, :username]),
+        user: conversation.user.as_json(only: [:id, :first_name, :last_name, :username, :avatar_url]),
         last_message: msg.as_json(only: [:id, :body, :direction, :created_at]),
         unread_count: conversation.unread_count,
         last_message_at: conversation.last_message_at
@@ -271,6 +317,82 @@ class AuthController < ApplicationController
   rescue => e
     Rails.logger.error "Error in handle_text_message: #{e.message}"
     Rails.logger.error e.backtrace.join("\n")
+  end
+
+  def send_message_to_n8n(message, user, conversation)
+    return if N8N_WEBHOOK_URL.blank?
+
+    begin
+      require 'net/http'
+      require 'json'
+
+      uri = URI(N8N_WEBHOOK_URL)
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = true
+      http.open_timeout = 5
+      http.read_timeout = 5
+
+      request = Net::HTTP::Post.new(uri.path)
+      request['Authorization'] = "Bearer #{N8N_API_TOKEN}" if N8N_API_TOKEN.present?
+      request['Content-Type'] = 'application/json'
+
+      payload = {
+        event: 'message_received',
+        message_id: message.id,
+        telegram_message_id: message.telegram_message_id,
+        text: message.body,
+        timestamp: message.created_at.iso8601,
+        conversation_id: conversation.id,
+        user: {
+          id: user.id,
+          telegram_id: user.telegram_id,
+          username: user.username,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          avatar_url: user.avatar_url
+        },
+        conversation_history: format_conversation_history(conversation)
+      }
+
+      request.body = payload.to_json
+
+      response = http.request(request)
+
+      if response.is_a?(Net::HTTPSuccess)
+        Rails.logger.info "N8N webhook sent successfully for message #{message.id}"
+      else
+        Rails.logger.warn "N8N webhook failed: HTTP #{response.code} - #{response.body}"
+      end
+    rescue => e
+      Rails.logger.error "N8N webhook error for message #{message.id}: #{e.message}"
+    end
+  end
+
+  def format_conversation_history(conversation)
+    # Получаем последние 50 сообщений, сортируем от старых к новым
+    messages = conversation.messages
+                          .order(created_at: :desc)
+                          .limit(50)
+                          .reverse
+
+    # Форматируем каждое сообщение
+    formatted_messages = messages.map do |msg|
+      # Определяем отправителя
+      sender = if msg.outgoing?
+                 "Сотрудник"
+               else
+                 "Клиент #{conversation.user.first_name}"
+               end
+
+      # Форматируем время
+      timestamp = msg.created_at.strftime("%Y-%m-%d %H:%M")
+
+      # Собираем строку
+      "[#{timestamp}] #{sender}: #{msg.body}"
+    end
+
+    # Объединяем все сообщения с переносами строк
+    formatted_messages.join("\n")
   end
 
   def bot_client
