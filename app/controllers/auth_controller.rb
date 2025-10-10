@@ -268,15 +268,24 @@ class AuthController < ApplicationController
 
   def handle_text_message(message)
     telegram_id = message["from"]["id"]
-    user = User.find_by(telegram_id: telegram_id, authenticated: true)
+    from = message["from"]
 
-    # Игнорируем сообщения от неавторизованных пользователей
-    return unless user
+    # Находим или создаем пользователя (без проверки authenticated)
+    user = User.find_or_initialize_by(telegram_id: telegram_id)
 
-    # Обновляем аватарку если её нет или прошло время
-    if user.avatar_url.blank? || user.updated_at < 1.day.ago
+    # Если пользователь новый или данные устарели - обновляем
+    if user.new_record? || user.updated_at < 1.day.ago
+      user.assign_attributes(
+        username: from["username"],
+        first_name: from["first_name"],
+        last_name: from["last_name"]
+      )
+
+      # Получаем аватарку
       avatar_url = fetch_user_avatar(telegram_id)
-      user.update(avatar_url: avatar_url) if avatar_url
+      user.avatar_url = avatar_url if avatar_url
+
+      user.save!
     end
 
     Rails.logger.info "Handle text message from user_id=#{user.id}: #{message['text']}"

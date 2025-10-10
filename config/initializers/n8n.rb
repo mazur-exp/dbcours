@@ -13,12 +13,8 @@
 # N8N API Token (JWT)
 N8N_API_TOKEN = Rails.application.credentials.dig(:n8n, :api_token)
 
-# N8N Webhook URL (automatically switches between test/production based on environment)
-N8N_WEBHOOK_URL = if Rails.env.production?
-  Rails.application.credentials.dig(:n8n, :webhook_url, :production)
-else
-  Rails.application.credentials.dig(:n8n, :webhook_url, :test)
-end
+# N8N Webhook URL (using production webhook in all environments)
+N8N_WEBHOOK_URL = Rails.application.credentials.dig(:n8n, :webhook_url, :production)
 
 # Validate credentials are present
 if N8N_API_TOKEN.blank?
