@@ -138,6 +138,91 @@
               </div>
             </div>
 
+            <!-- AI Квалификация -->
+            <% if @active_conversation.ai_real_name.present? || @active_conversation.ai_background.present? || @active_conversation.ai_query.present? || @active_conversation.ai_ready_score.present? %>
+              <div class="bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg p-4 border border-purple-100">
+                <h4 class="text-sm font-semibold text-purple-700 mb-3 flex items-center gap-2">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                  </svg>
+                  AI Квалификация
+                </h4>
+
+                <div class="space-y-3">
+                  <% if @active_conversation.ai_real_name.present? %>
+                    <div>
+                      <p class="text-xs text-purple-600 mb-1 flex items-center gap-1">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                        </svg>
+                        Имя
+                      </p>
+                      <p class="text-sm font-medium text-gray-900"><%= @active_conversation.ai_real_name %></p>
+                    </div>
+                  <% end %>
+
+                  <% if @active_conversation.ai_background.present? %>
+                    <div>
+                      <p class="text-xs text-purple-600 mb-1 flex items-center gap-1">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                        Бэкграунд
+                      </p>
+                      <p class="text-sm text-gray-900"><%= @active_conversation.ai_background %></p>
+                    </div>
+                  <% end %>
+
+                  <% if @active_conversation.ai_query.present? %>
+                    <div>
+                      <p class="text-xs text-purple-600 mb-1 flex items-center gap-1">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Запрос/Цель
+                      </p>
+                      <p class="text-sm text-gray-900"><%= @active_conversation.ai_query %></p>
+                    </div>
+                  <% end %>
+
+                  <% if @active_conversation.ai_ready_score.present? %>
+                    <div>
+                      <p class="text-xs text-purple-600 mb-1 flex items-center gap-1">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                        Готовность к покупке
+                      </p>
+                      <%
+                        score = @active_conversation.ai_ready_score.to_i
+                        badge_class = if score >= 8
+                          "bg-green-100 text-green-800 border-green-200"
+                        elsif score >= 4
+                          "bg-yellow-100 text-yellow-800 border-yellow-200"
+                        else
+                          "bg-red-100 text-red-800 border-red-200"
+                        end
+
+                        label = if score >= 8
+                          "🟢 Горячий лид"
+                        elsif score >= 4
+                          "🟡 Тёплый лид"
+                        else
+                          "🔴 Холодный лид"
+                        end
+                      %>
+                      <div class="flex items-center gap-2">
+                        <span class="inline-flex items-center px-3 py-1.5 text-sm font-semibold rounded-full border <%= badge_class %>">
+                          <%= label %>
+                        </span>
+                        <span class="text-lg font-bold text-gray-900"><%= score %>/10</span>
+                      </div>
+                    </div>
+                  <% end %>
+                </div>
+              </div>
+            <% end %>
+
             <!-- Статистика сообщений -->
             <div class="bg-gray-50 rounded-lg p-4">
               <h4 class="text-sm font-semibold text-gray-700 mb-3">Статистика</h4>

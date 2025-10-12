@@ -176,14 +176,14 @@ end
 
 ### 3. AI Response Processing
 
-**Location:** `app/controllers/n8n_controller.rb` (Lines 8-152)
+**Location:** `app/controllers/n8n_controller.rb` (Lines 10-146)
 
 **Complete Implementation:**
 
 ```ruby
 def send_message
   telegram_id = params[:telegram_id]
-  text_raw = params[:text]
+  text_to_send = params[:text]
 
   # Validate parameters
   if telegram_id.blank?
@@ -191,28 +191,22 @@ def send_message
     return
   end
 
-  if text_raw.blank?
+  if text_to_send.blank?
     render json: { error: 'text is required' }, status: :unprocessable_entity
     return
   end
 
-  # PARSE AI RESPONSE
-  # AI may wrap JSON in markdown code block: ```json\n{...}\n```
-  ai_data = parse_ai_response(text_raw)
-
-  # Extract text for user (only output field)
-  text_to_send = ai_data[:output] || text_raw
-
-  # Extract qualification data
+  # AI квалификация - принимаем параметры напрямую из N8N
+  # N8N отправляет отдельные поля через Code ноду (см. секцию HTTP Request Node)
   qualification_data = {
-    real_name: ai_data[:real_name],
-    background: ai_data[:background],
-    query: ai_data[:query],
-    ready_score: ai_data[:ready]
+    real_name: params[:real_name],
+    background: params[:background],
+    query: params[:query],
+    ready_score: params[:ready]
   }
 
-  Rails.logger.info "Extracted output: #{text_to_send[0..100]}..."
-  Rails.logger.info "Qualification data: #{qualification_data.inspect}"
+  Rails.logger.info "Text to send: #{text_to_send[0..100]}..."
+  Rails.logger.info "AI qualification: #{qualification_data.inspect}"
 
   # Find user
   user = User.find_by(telegram_id: telegram_id)
@@ -229,6 +223,7 @@ def send_message
   Rails.logger.info "AI processing finished for conversation #{conversation.id}"
 
   # SAVE AI QUALIFICATION DATA
+  # Сохраняем все AI поля в conversation для отображения в dashboard
   conversation.update!(
     ai_real_name: qualification_data[:real_name],
     ai_background: qualification_data[:background],
@@ -236,7 +231,7 @@ def send_message
     ai_ready_score: qualification_data[:ready_score]
   )
 
-  Rails.logger.info "AI qualification saved"
+  Rails.logger.info "AI qualification saved for conversation #{conversation.id}"
 
   # SEND TO TELEGRAM
   begin
@@ -303,62 +298,19 @@ end
 
 **Key Steps:**
 
-1. **Receive AI response** - `text_raw` parameter from N8N
-2. **Parse JSON** - Extract `output`, `real_name`, `background`, `query`, `ready` fields
-3. **Stop typing** - Set `ai_processing = false` (TypingIndicatorJob will stop on next check)
-4. **Save qualification** - Store AI-extracted lead data in conversation
-5. **Send to Telegram** - With Markdown formatting
-6. **Broadcast to admin** - Update dashboard in real-time
+1. **Receive parameters** - N8N отправляет отдельные поля:
+   - `params[:text]` - текст для пользователя
+   - `params[:real_name]`, `params[:background]`, `params[:query]`, `params[:ready]` - квалификация
+2. **Stop typing** - Set `ai_processing = false` (TypingIndicatorJob will stop on next check)
+3. **Save qualification** - Store AI-extracted lead data in conversation (ai_real_name, ai_background, ai_query, ai_ready_score)
+4. **Send to Telegram** - `text` отправляется с Markdown форматированием
+5. **Broadcast to admin** - Update dashboard in real-time with new message and qualification data
 
 ---
 
-### 4. JSON Response Parsing
+### 4. AI Response Format & Code Node
 
-**Location:** `app/controllers/n8n_controller.rb` (Lines 156-195)
-
-**Implementation:**
-
-```ruby
-def parse_ai_response(text)
-  # AI may wrap JSON in markdown code block: ```json\n{...}\n```
-  begin
-    clean_text = text.strip
-
-    # Remove markdown code block if present
-    if clean_text.start_with?('```json') || clean_text.start_with?('```')
-      clean_text = clean_text.gsub(/^```json\n?/, '')
-                             .gsub(/^```\n?/, '')
-                             .gsub(/\n?```$/, '')
-    end
-
-    # Parse JSON
-    parsed = JSON.parse(clean_text, symbolize_names: true)
-
-    Rails.logger.info "Successfully parsed AI response: #{parsed.keys.join(', ')}"
-
-    # Return expected fields
-    {
-      output: parsed[:output],        # Message text to send to user
-      real_name: parsed[:real_name],  # User's real name (extracted)
-      background: parsed[:background], # User background/business stage
-      query: parsed[:query],          # Main question/intent
-      ready: parsed[:ready]           # Readiness score (0-100)
-    }
-  rescue JSON::ParserError => e
-    Rails.logger.warn "Could not parse AI response as JSON: #{e.message}"
-    Rails.logger.warn "Treating as plain text"
-
-    # Fallback: treat as plain text
-    {
-      output: text,
-      real_name: nil,
-      background: nil,
-      query: nil,
-      ready: nil
-    }
-  end
-end
-```
+**N8N Code Node:** Извлекает поля из AI ответа
 
 **Expected AI Response Format:**
 
@@ -368,7 +320,7 @@ end
   "real_name": "Александр",
   "background": "Владеет рестораном в Москве, хочет открыть доставку еды на Бали",
   "query": "Стоимость и сроки запуска доставки еды",
-  "ready": 75
+  "ready": "7"
 }
 ```
 
@@ -378,25 +330,18 @@ end
 - `real_name` (optional) - Extracted real name from conversation
 - `background` (optional) - User's business context/situation
 - `query` (optional) - Main question or intent identified
-- `ready` (optional) - Lead readiness score (0-100, where 100 = ready to buy)
+- `ready` (optional) - Lead readiness score (0-10, where 10 = ready to buy now)
 
-**Markdown Code Block Support:**
+**N8N Code Node (between AI Agent and HTTP Request):**
 
-AI can return:
-```
-```json
-{
-  "output": "Hello!",
-  "ready": 50
-}
-```
-```
+См. код выше в разделе "HTTP Request Node" - Code нода парсит JSON и возвращает отдельные поля.
 
-Parser will strip ````json` and `````, then parse the clean JSON.
-
-**Fallback Behavior:**
-
-If parsing fails → entire text becomes `output`, qualification fields are `nil`. Message still sends successfully.
+**Rails принимает напрямую:**
+- `params[:text]` → отправляется пользователю
+- `params[:real_name]` → сохраняется в `conversation.ai_real_name`
+- `params[:background]` → сохраняется в `conversation.ai_background`
+- `params[:query]` → сохраняется в `conversation.ai_query`
+- `params[:ready]` → сохраняется в `conversation.ai_ready_score`
 
 ---
 
@@ -411,7 +356,7 @@ If parsing fails → entire text becomes `output`, qualification fields are `nil
 t.string  :ai_real_name      # User's real name (extracted by AI)
 t.text    :ai_background     # User background/business stage
 t.text    :ai_query          # Main question/intent
-t.integer :ai_ready_score    # Readiness score (0-100)
+t.integer :ai_ready_score    # Readiness score (0-10)
 t.boolean :ai_processing     # Flag: AI is processing message
 ```
 
@@ -421,18 +366,21 @@ These fields enable automatic lead qualification during conversations:
 
 1. **ai_real_name** - AI extracts user's real name from casual chat
    - Example: "Hi, I'm Alex" → `ai_real_name = "Alex"`
+   - Отображается в messenger dashboard как "Имя"
 
 2. **ai_background** - Business context, current situation
    - Example: "I own 3 restaurants in Moscow" → `ai_background = "Restaurant owner, 3 locations, Moscow"`
+   - Помогает понять контекст клиента
 
 3. **ai_query** - Main question or goal
    - Example: "How much to start food delivery in Bali?" → `ai_query = "Cost of starting food delivery business in Bali"`
+   - Отображается как "Запрос/Цель"
 
-4. **ai_ready_score** - Lead readiness (0-100)
-   - 0-30: Just exploring, no urgency
-   - 31-60: Interested, gathering information
-   - 61-85: Serious buyer, evaluating options
-   - 86-100: Ready to purchase, needs final push
+4. **ai_ready_score** - Lead readiness (0-10 шкала)
+   - **0-3** (🔴 Холодный лид): Просто изучает, нет urgency, задаёт общие вопросы
+   - **4-7** (🟡 Тёплый лид): Интересуется конкретно, собирает информацию, сравнивает варианты
+   - **8-10** (🟢 Горячий лид): Готов к покупке, спрашивает детали оплаты, условия
+   - Отображается в messenger с цветовым индикатором
 
 5. **ai_processing** - Technical flag for typing indicator
    - `true` = AI is analyzing, show typing indicator
@@ -443,17 +391,17 @@ These fields enable automatic lead qualification during conversations:
 **Sales Dashboard:**
 ```ruby
 # Show hot leads (ready to buy)
-hot_leads = Conversation.where('ai_ready_score >= ?', 75)
+hot_leads = Conversation.where('ai_ready_score >= ?', 8)
                         .includes(:user)
                         .order(ai_ready_score: :desc)
 ```
 
 **Lead Scoring:**
 ```ruby
-# Segment leads by readiness
-cold_leads = Conversation.where('ai_ready_score < 40')
-warm_leads = Conversation.where('ai_ready_score BETWEEN 40 AND 70')
-hot_leads = Conversation.where('ai_ready_score > 70')
+# Segment leads by readiness (0-10 шкала)
+cold_leads = Conversation.where('ai_ready_score <= 3')   # 🔴 Холодные
+warm_leads = Conversation.where('ai_ready_score BETWEEN 4 AND 7')  # 🟡 Тёплые
+hot_leads = Conversation.where('ai_ready_score >= 8')    # 🟢 Горячие
 ```
 
 **Analytics:**
@@ -464,6 +412,63 @@ Conversation.where.not(ai_query: nil)
             .count
             .sort_by { |k, v| -v }
 ```
+
+### Messenger Dashboard Display
+
+**Location:** Right sidebar in `/messenger` (когда выбрана беседа)
+
+**UI Секция "🤖 AI Квалификация":**
+
+Отображается как отдельная карточка с градиентным фоном (purple-to-blue):
+
+```erb
+<!-- Если есть хотя бы одно AI поле -->
+<div class="bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg p-4">
+  <h4>🤖 AI Квалификация</h4>
+
+  <!-- Real Name (если заполнено) -->
+  <div>
+    <p class="text-xs text-purple-600">👤 Имя</p>
+    <p class="text-sm font-medium">Александр</p>
+  </div>
+
+  <!-- Background -->
+  <div>
+    <p class="text-xs text-purple-600">💼 Бэкграунд</p>
+    <p class="text-sm">Владеет рестораном в Москве, планирует открыть доставку</p>
+  </div>
+
+  <!-- Query -->
+  <div>
+    <p class="text-xs text-purple-600">❓ Запрос/Цель</p>
+    <p class="text-sm">Хочет понять стоимость и сроки запуска</p>
+  </div>
+
+  <!-- Ready Score с цветовым индикатором -->
+  <div>
+    <p class="text-xs text-purple-600">⚡ Готовность к покупке</p>
+    <div class="flex items-center gap-2">
+      <span class="badge bg-yellow-100 text-yellow-800">🟡 Тёплый лид</span>
+      <span class="text-lg font-bold">7/10</span>
+    </div>
+  </div>
+</div>
+```
+
+**Цветовая индикация готовности:**
+- 🔴 **0-3** - Холодный лид (bg-red-100 text-red-800)
+- 🟡 **4-7** - Тёплый лид (bg-yellow-100 text-yellow-800)
+- 🟢 **8-10** - Горячий лид (bg-green-100 text-green-800)
+
+**Визуальное отличие от других секций:**
+- Градиентный фон (purple-to-blue) выделяет AI данные
+- Фиолетовые иконки и лейблы
+- Показывается только если есть хотя бы одно заполненное поле
+
+**Обновление в реальном времени:**
+- AI данные обновляются при каждом ответе AI
+- Можно видеть эволюцию квалификации по ходу беседы
+- Ready score может повышаться/понижаться
 
 ---
 
@@ -679,7 +684,7 @@ IMPORTANT:
 
 **Method:** POST
 
-**URL:** `{{$env.RAILS_API_URL}}/api/n8n/send_message`
+**URL:** `{{ $node["Webhook"].json.callback_url }}`
 
 **Headers:**
 ```json
@@ -689,15 +694,47 @@ IMPORTANT:
 }
 ```
 
-**Body:**
-```json
-{
-  "telegram_id": {{$json.user.telegram_id}},
-  "text": {{$json.ai_response}}
+**Body Type:** JSON
+
+**Parameters (добавить в Body Parameters):**
+
+| Name | Value | Description |
+|------|-------|-------------|
+| `telegram_id` | `{{ $node["Webhook"].json.user.telegram_id }}` | Telegram ID пользователя |
+| `text` | `{{ $json.text }}` | Текст сообщения для отправки |
+| `real_name` | `{{ $json.real_name }}` | Имя клиента (из Code ноды) |
+| `background` | `{{ $json.background }}` | Бэкграунд клиента (из Code ноды) |
+| `query` | `{{ $json.query }}` | Запрос/цель клиента (из Code ноды) |
+| `ready` | `{{ $json.ready }}` | Готовность к покупке 0-10 (из Code ноды) |
+
+**ВАЖНО:** Нужна промежуточная **Code нода** между AI Agent и HTTP Request для извлечения полей из JSON:
+
+```javascript
+// Code нода: Extract AI Data
+const rawOutput = $input.item.json.output;
+
+// Убираем markdown code blocks если есть
+let cleanText = rawOutput.trim();
+if (cleanText.startsWith('```json') || cleanText.startsWith('```')) {
+  cleanText = cleanText.replace(/^```json\n?/, '')
+                       .replace(/^```\n?/, '')
+                       .replace(/\n?```$/, '');
 }
+
+// Парсим JSON
+const parsed = JSON.parse(cleanText);
+
+// Возвращаем отдельные поля для HTTP Request
+return {
+  text: parsed.output,
+  real_name: parsed.real_name || "",
+  background: parsed.background || "",
+  query: parsed.query || "",
+  ready: parsed.ready || "0"
+};
 ```
 
-**Note:** `ai_response` is the entire JSON string from AI (including ```json code block if present). Rails will parse it.
+**Результат:** Rails получает все параметры отдельно, сохраняет квалификацию в базу, отправляет `text` пользователю.
 
 ---
 

@@ -12,7 +12,7 @@ class N8nController < ApplicationController
     Rails.logger.info "Params: #{params.inspect}"
 
     telegram_id = params[:telegram_id]
-    text_raw = params[:text]
+    text_to_send = params[:text]
 
     # Валидация параметров
     if telegram_id.blank?
@@ -20,27 +20,21 @@ class N8nController < ApplicationController
       return
     end
 
-    if text_raw.blank?
+    if text_to_send.blank?
       render json: { error: 'text is required' }, status: :unprocessable_entity
       return
     end
 
-    # Парсим JSON из markdown code block если есть
-    ai_data = parse_ai_response(text_raw)
-
-    # Текст для отправки клиенту (только output)
-    text_to_send = ai_data[:output] || text_raw
-
-    # Данные для сохранения в БД
+    # AI квалификация - принимаем параметры напрямую из N8N
     qualification_data = {
-      real_name: ai_data[:real_name],
-      background: ai_data[:background],
-      query: ai_data[:query],
-      ready_score: ai_data[:ready]
+      real_name: params[:real_name],
+      background: params[:background],
+      query: params[:query],
+      ready_score: params[:ready]
     }
 
-    Rails.logger.info "Extracted output: #{text_to_send[0..100]}..."
-    Rails.logger.info "Qualification data: #{qualification_data.inspect}"
+    Rails.logger.info "Text to send: #{text_to_send[0..100]}..."
+    Rails.logger.info "AI qualification: #{qualification_data.inspect}"
 
     # Находим пользователя
     user = User.find_by(telegram_id: telegram_id)
@@ -152,47 +146,6 @@ class N8nController < ApplicationController
   end
 
   private
-
-  def parse_ai_response(text)
-    # AI может обернуть JSON в markdown code block: ```json\n{...}\n```
-    # Нужно извлечь чистый JSON и распарсить
-
-    begin
-      # Убираем markdown code block если есть
-      clean_text = text.strip
-
-      if clean_text.start_with?('```json') || clean_text.start_with?('```')
-        # Убираем ```json в начале и ``` в конце
-        clean_text = clean_text.gsub(/^```json\n?/, '').gsub(/^```\n?/, '').gsub(/\n?```$/, '')
-      end
-
-      # Парсим JSON
-      parsed = JSON.parse(clean_text, symbolize_names: true)
-
-      Rails.logger.info "Successfully parsed AI response: #{parsed.keys.join(', ')}"
-
-      # Возвращаем хэш с ожидаемыми полями
-      {
-        output: parsed[:output],
-        real_name: parsed[:real_name],
-        background: parsed[:background],
-        query: parsed[:query],
-        ready: parsed[:ready]
-      }
-    rescue JSON::ParserError => e
-      Rails.logger.warn "Could not parse AI response as JSON: #{e.message}"
-      Rails.logger.warn "Treating as plain text"
-
-      # Если не JSON - возвращаем как есть в output
-      {
-        output: text,
-        real_name: nil,
-        background: nil,
-        query: nil,
-        ready: nil
-      }
-    end
-  end
 
   def verify_n8n_token
     token = request.headers['Authorization']&.split(' ')&.last
