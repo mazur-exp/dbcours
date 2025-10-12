@@ -2,7 +2,27 @@ import { Controller } from "@hotwired/stimulus"
 import consumer from "channels/consumer"
 
 export default class extends Controller {
-  static targets = ["messages", "input", "conversationsList"]
+  static targets = [
+    "messages",
+    "input",
+    "conversationsList",
+    // AI Qualification targets
+    "aiQualificationSection",
+    "aiQualificationContent",
+    "aiRealNameContainer",
+    "aiRealName",
+    "aiBackgroundContainer",
+    "aiBackground",
+    "aiQueryContainer",
+    "aiQuery",
+    "aiReadyScoreContainer",
+    "aiReadyBadge",
+    "aiReadyScore",
+    // Statistics targets
+    "totalMessages",
+    "incomingMessages",
+    "outgoingMessages"
+  ]
 
   connect() {
     // Ищем именно элемент main с активным conversation-id, а не первый попавшийся
@@ -63,6 +83,104 @@ export default class extends Controller {
     // Обновляем список чатов
     if (conversation) {
       this.updateConversationsList(conversationId, conversation)
+    }
+
+    // Обновляем правую панель если это активная беседа
+    if (String(conversationId) === String(this.activeConversationId) && conversation) {
+      this.updateSidebar(conversation)
+    }
+  }
+
+  updateSidebar(conversationData) {
+    // Обновляем AI Qualification
+    if (conversationData.ai_qualification) {
+      this.updateAIQualification(conversationData.ai_qualification)
+    }
+
+    // Обновляем статистику
+    if (conversationData.statistics) {
+      this.updateStatistics(conversationData.statistics)
+    }
+  }
+
+  updateAIQualification(aiData) {
+    const { real_name, background, query, ready_score } = aiData
+
+    // Обновляем Real Name
+    if (real_name && this.hasAiRealNameTarget) {
+      this.aiRealNameTarget.textContent = real_name
+      // Показываем контейнер если был скрыт
+      if (this.hasAiRealNameContainerTarget) {
+        this.aiRealNameContainerTarget.style.display = 'block'
+      }
+    }
+
+    // Обновляем Background
+    if (background && this.hasAiBackgroundTarget) {
+      this.aiBackgroundTarget.textContent = background
+      if (this.hasAiBackgroundContainerTarget) {
+        this.aiBackgroundContainerTarget.style.display = 'block'
+      }
+    }
+
+    // Обновляем Query
+    if (query && this.hasAiQueryTarget) {
+      this.aiQueryTarget.textContent = query
+      if (this.hasAiQueryContainerTarget) {
+        this.aiQueryContainerTarget.style.display = 'block'
+      }
+    }
+
+    // Обновляем Ready Score с цветовым badge
+    if (ready_score !== null && ready_score !== undefined) {
+      const score = parseInt(ready_score)
+
+      if (this.hasAiReadyScoreTarget) {
+        this.aiReadyScoreTarget.textContent = `${score}/10`
+      }
+
+      if (this.hasAiReadyBadgeTarget) {
+        // Определяем цвет и лейбл
+        let badgeClass, label
+        if (score >= 8) {
+          badgeClass = "bg-green-100 text-green-800 border-green-200"
+          label = "🟢 Горячий лид"
+        } else if (score >= 4) {
+          badgeClass = "bg-yellow-100 text-yellow-800 border-yellow-200"
+          label = "🟡 Тёплый лид"
+        } else {
+          badgeClass = "bg-red-100 text-red-800 border-red-200"
+          label = "🔴 Холодный лид"
+        }
+
+        // Обновляем классы и текст
+        this.aiReadyBadgeTarget.className = `inline-flex items-center px-3 py-1.5 text-sm font-semibold rounded-full border ${badgeClass}`
+        this.aiReadyBadgeTarget.textContent = label
+      }
+
+      // Показываем контейнер
+      if (this.hasAiReadyScoreContainerTarget) {
+        this.aiReadyScoreContainerTarget.style.display = 'block'
+      }
+    }
+
+    // Показываем секцию AI Qualification если есть хотя бы одно поле
+    if ((real_name || background || query || ready_score) && this.hasAiQualificationSectionTarget) {
+      this.aiQualificationSectionTarget.style.display = 'block'
+    }
+  }
+
+  updateStatistics(stats) {
+    if (this.hasTotalMessagesTarget) {
+      this.totalMessagesTarget.textContent = stats.total_messages
+    }
+
+    if (this.hasIncomingMessagesTarget) {
+      this.incomingMessagesTarget.textContent = stats.incoming_count
+    }
+
+    if (this.hasOutgoingMessagesTarget) {
+      this.outgoingMessagesTarget.textContent = stats.outgoing_count
     }
   }
 

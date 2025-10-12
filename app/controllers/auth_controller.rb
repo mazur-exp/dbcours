@@ -191,7 +191,20 @@ class AuthController < ApplicationController
             user: user.as_json(only: [:id, :first_name, :last_name, :username, :avatar_url]),
             last_message: welcome_message.as_json(only: [:id, :body, :direction, :created_at]),
             unread_count: conversation.unread_count,
-            last_message_at: conversation.last_message_at
+            last_message_at: conversation.last_message_at,
+            # AI Qualification данные для real-time обновления sidebar
+            ai_qualification: {
+              real_name: conversation.ai_real_name,
+              background: conversation.ai_background,
+              query: conversation.ai_query,
+              ready_score: conversation.ai_ready_score
+            },
+            # Статистика сообщений
+            statistics: {
+              total_messages: conversation.messages.count,
+              incoming_count: conversation.messages.incoming.count,
+              outgoing_count: conversation.messages.outgoing.count
+            }
           }
         })
 
@@ -329,7 +342,20 @@ class AuthController < ApplicationController
         user: conversation.user.as_json(only: [:id, :first_name, :last_name, :username, :avatar_url]),
         last_message: msg.as_json(only: [:id, :body, :direction, :created_at]),
         unread_count: conversation.unread_count,
-        last_message_at: conversation.last_message_at
+        last_message_at: conversation.last_message_at,
+        # AI Qualification данные для real-time обновления sidebar
+        ai_qualification: {
+          real_name: conversation.ai_real_name,
+          background: conversation.ai_background,
+          query: conversation.ai_query,
+          ready_score: conversation.ai_ready_score
+        },
+        # Статистика сообщений
+        statistics: {
+          total_messages: conversation.messages.count,
+          incoming_count: conversation.messages.incoming.count,
+          outgoing_count: conversation.messages.outgoing.count
+        }
       }
     })
   rescue => e

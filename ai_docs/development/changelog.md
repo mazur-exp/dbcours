@@ -15,8 +15,18 @@ This document tracks all significant changes, features, and updates to the Bali 
   - Color-coded ready score badges (🔴 0-3, 🟡 4-7, 🟢 8-10)
   - Gradient purple-to-blue design distinguishes AI data from user info
   - Auto-hides section if no qualification data present
-  - **File:** `app/views/messenger/index.html.erb` (lines 142-224)
-  - **Documentation:** `messenger_feature.md` - New "AI Qualification Display" section
+  - **Real-time updates via ActionCable** - No page refresh needed! ✨
+  - **Files:**
+    - `app/views/messenger/index.html.erb` (lines 143-224) - UI with data-targets
+    - `app/javascript/controllers/messenger_controller.js` (lines 94-185) - Real-time update logic
+  - **Documentation:** `messenger_feature.md` - "AI Qualification Display" section with real-time updates
+
+- **Real-Time Sidebar Updates**
+  - AI qualification updates automatically when N8N sends data
+  - Message statistics increment without refresh
+  - Color-coded ready score badge changes in real-time
+  - Dynamic show/hide of AI qualification fields
+  - Smooth UX - admin sees changes instantly
 
 ### Changed
 - **N8nController Parameter Handling**
@@ -26,6 +36,15 @@ This document tracks all significant changes, features, and updates to the Bali 
   - Cleaner code: -65 lines removed
   - **File:** `app/controllers/n8n_controller.rb`
   - **Documentation:** Updated `ai_auto_responder.md` with new parameter structure
+
+- **ActionCable Broadcasts Enhanced** (3 controllers updated)
+  - Added `ai_qualification` object to broadcasts (real_name, background, query, ready_score)
+  - Added `statistics` object to broadcasts (total, incoming, outgoing counts)
+  - Enables real-time sidebar updates without page refresh
+  - **Files:**
+    - `app/controllers/n8n_controller.rb` (lines 99-111)
+    - `app/controllers/messenger_controller.rb` (lines 78-90)
+    - `app/controllers/auth_controller.rb` (lines 196-208, 334-346)
 
 ### Documentation
 - **Comprehensive Documentation Review**

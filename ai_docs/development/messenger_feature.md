@@ -900,7 +900,7 @@ conversation.update!(
 
 ### Real-Time Updates
 
-**Update Trigger:** AI sends response via N8N → Rails
+**Update Trigger:** AI sends response via N8N → Rails → ActionCable broadcast
 
 **Data Flow:**
 1. User sends message in Telegram
@@ -908,9 +908,14 @@ conversation.update!(
 3. AI generates response with qualification data
 4. N8N sends to Rails with separate parameters
 5. Rails saves AI data to `conversation` table
-6. Page refresh shows updated qualification
+6. **Rails broadcasts via ActionCable with AI data**
+7. **Messenger Stimulus controller updates sidebar automatically** ✨
 
-**Future Enhancement:** Real-time update via ActionCable broadcast (no refresh needed)
+**Real-Time Updates:** ✅ Implemented (October 12, 2025)
+- No page refresh needed
+- AI data appears instantly when N8N sends response
+- Ready score badge updates with correct color (🔴🟡🟢)
+- Statistics increment automatically with each message
 
 ---
 
@@ -994,7 +999,80 @@ User Message → AI Analysis → N8N → Rails (N8nController)
                                       ↓
                             Save to conversation fields
                                       ↓
-                            Display in messenger dashboard
+                         ActionCable broadcast with AI data
+                                      ↓
+                    Messenger Stimulus controller receives data
+                                      ↓
+                         Updates sidebar UI automatically
+```
+
+**Technical Implementation:**
+
+**Backend Broadcast (N8nController, MessengerController, AuthController):**
+```ruby
+ActionCable.server.broadcast("messenger_channel", {
+  type: 'new_message',
+  conversation: {
+    # ... other fields
+    ai_qualification: {
+      real_name: conversation.ai_real_name,
+      background: conversation.ai_background,
+      query: conversation.ai_query,
+      ready_score: conversation.ai_ready_score
+    },
+    statistics: {
+      total_messages: conversation.messages.count,
+      incoming_count: conversation.messages.incoming.count,
+      outgoing_count: conversation.messages.outgoing.count
+    }
+  }
+})
+```
+
+**Frontend Handler (messenger_controller.js:88-185):**
+```javascript
+handleNewMessage(data) {
+  // ... handle message display
+
+  // Update sidebar if active conversation
+  if (String(conversationId) === String(this.activeConversationId)) {
+    this.updateSidebar(data.conversation)
+  }
+}
+
+updateSidebar(conversationData) {
+  if (conversationData.ai_qualification) {
+    this.updateAIQualification(conversationData.ai_qualification)
+  }
+  if (conversationData.statistics) {
+    this.updateStatistics(conversationData.statistics)
+  }
+}
+
+updateAIQualification(aiData) {
+  // Updates real_name, background, query fields
+  // Updates ready_score with color-coded badge
+  // Shows/hides containers dynamically
+}
+
+updateStatistics(stats) {
+  // Updates total_messages, incoming_count, outgoing_count
+}
+```
+
+**Stimulus Targets:**
+```javascript
+static targets = [
+  "aiQualificationSection",    // Container for entire AI section
+  "aiRealName",                 // Real name text
+  "aiBackground",               // Background text
+  "aiQuery",                    // Query text
+  "aiReadyBadge",              // Badge with color and label
+  "aiReadyScore",              // Score number (7/10)
+  "totalMessages",             // Total message count
+  "incomingMessages",          // Incoming count
+  "outgoingMessages"           // Outgoing count
+]
 ```
 
 ---
