@@ -118,18 +118,20 @@ class N8nController < ApplicationController
         user_id: user.id,
         conversation_id: conversation.id
       }
-    rescue Telegram::Bot::Error => e
+    rescue Telegram::Bot::Exceptions::ResponseError => e
       Rails.logger.error "Telegram API error: #{e.message}"
 
       # Fallback: попробовать без Markdown если ошибка парсинга
-      if e.message.include?('parse')
+      if e.message.include?('parse') || e.message.include?("can't parse entities")
         begin
+          Rails.logger.warn "Markdown parse error detected, retrying without Markdown"
+
           result = bot_client.api.send_message(
             chat_id: telegram_id,
             text: text_to_send
           )
 
-          Rails.logger.warn "Sent without Markdown due to parse error"
+          Rails.logger.info "Successfully sent as plain text (no Markdown)"
 
           message = conversation.messages.create!(
             body: text_to_send,
@@ -138,6 +140,33 @@ class N8nController < ApplicationController
             read: true,
             user_id: nil
           )
+
+          # Reload and broadcast
+          conversation.reload
+
+          ActionCable.server.broadcast("messenger_channel", {
+            type: 'new_message',
+            conversation_id: conversation.id,
+            message: message.as_json(include: :user),
+            conversation: {
+              id: conversation.id,
+              user: user.as_json(only: [:id, :first_name, :last_name, :username, :avatar_url]),
+              last_message: message.as_json(only: [:id, :body, :direction, :created_at]),
+              unread_count: conversation.unread_count,
+              last_message_at: conversation.last_message_at,
+              ai_qualification: {
+                real_name: conversation.ai_real_name,
+                background: conversation.ai_background,
+                query: conversation.ai_query,
+                ready_score: conversation.ai_ready_score
+              },
+              statistics: {
+                total_messages: conversation.messages.count,
+                incoming_count: conversation.messages.incoming.count,
+                outgoing_count: conversation.messages.outgoing.count
+              }
+            }
+          })
 
           render json: {
             success: true,
@@ -152,8 +181,9 @@ class N8nController < ApplicationController
       end
 
       render json: { error: "Failed to send message: #{e.message}" }, status: :internal_server_error
-    rescue => e
-      Rails.logger.error "N8N send_message error: #{e.message}"
+    rescue StandardError => e
+      Rails.logger.error "N8N send_message error: #{e.class.name} - #{e.message}"
+      Rails.logger.error e.backtrace.first(5).join("\n")
       render json: { error: 'Internal server error' }, status: :internal_server_error
     end
   end

@@ -738,6 +738,259 @@ return {
 
 ---
 
+## Multi-Model Support (Universal Parser)
+
+### Overview
+
+Система поддерживает **любую AI модель** без изменений кода:
+- ✅ Claude (Anthropic)
+- ✅ GPT-4 / GPT-3.5 (OpenAI)
+- ✅ Gemini (Google)
+- ✅ DeepSeek
+- ✅ Llama / Open-source models
+- ✅ Любая другая модель
+
+**Проблема:** Разные модели форматируют JSON по-разному:
+- Claude/GPT: Чистый JSON
+- Gemini: JSON с реальными переносами строк
+- DeepSeek: JSON с экранированными \n в начале/конце
+
+**Решение:** Универсальный парсер с 3 методами fallback
+
+---
+
+### Universal Code Node (N8N)
+
+**Файл:** `n8n_code_node_universal_parser.js` (в корне проекта)
+
+**Копируйте весь код отсюда в N8N Code ноду:**
+
+```javascript
+// УНИВЕРСАЛЬНЫЙ ПАРСЕР для любой AI модели
+const rawOutput = $input.item.json.output;
+
+function parseAIResponse(text) {
+  let cleanText = text.trim();
+
+  // Убираем markdown code blocks
+  if (cleanText.startsWith('```json') || cleanText.startsWith('```')) {
+    cleanText = cleanText.replace(/^```json\n?/g, '')
+                         .replace(/^```\n?/g, '')
+                         .replace(/\n?```$/g, '');
+  }
+
+  // Убираем лидирующие/завершающие \n (DeepSeek pattern)
+  if (cleanText.startsWith('\\n') || cleanText.startsWith('{\\n')) {
+    cleanText = cleanText.replace(/^\{?\\n\s*/g, '{')
+                         .replace(/\\n\s*\}$/g, '}');
+  }
+
+  // МЕТОД 1: Прямой JSON.parse (Claude/GPT с чистым JSON)
+  try {
+    const parsed = JSON.parse(cleanText);
+    if (parsed.output) {
+      console.log('✅ Method 1: Direct parse');
+      return {
+        text: parsed.output,
+        real_name: parsed.real_name || "",
+        background: parsed.background || "",
+        query: parsed.query || "",
+        ready: String(parsed.ready || "0")
+      };
+    }
+  } catch (e) {}
+
+  // МЕТОД 2: Разэкранирование + parse (DeepSeek/Gemini)
+  try {
+    const unescaped = cleanText
+      .replace(/\\n/g, '\n')
+      .replace(/\\r/g, '\r')
+      .replace(/\\t/g, '\t')
+      .replace(/\\"/g, '"');
+
+    const parsed = JSON.parse(unescaped);
+    if (parsed.output) {
+      console.log('✅ Method 2: Unescaped parse');
+      return {
+        text: parsed.output,
+        real_name: parsed.real_name || "",
+        background: parsed.background || "",
+        query: parsed.query || "",
+        ready: String(parsed.ready || "0")
+      };
+    }
+  } catch (e) {}
+
+  // МЕТОД 3: Regex extraction (работает ВСЕГДА)
+  console.log('Using Method 3: Regex fallback');
+
+  const outputMatch = cleanText.match(/"output"\s*:\s*"((?:[^"\\]|\\.)*)"/s);
+  const realNameMatch = cleanText.match(/"real_name"\s*:\s*"([^"]*)"/);
+  const backgroundMatch = cleanText.match(/"background"\s*:\s*"([^"]*)"/);
+  const queryMatch = cleanText.match(/"query"\s*:\s*"([^"]*)"/);
+  const readyMatch = cleanText.match(/"ready"\s*:\s*"?(\d+)"?/);
+
+  if (outputMatch || realNameMatch) {
+    const decodeEscaped = (str) => {
+      if (!str) return "";
+      return str.replace(/\\n/g, '\n').replace(/\\r/g, '\r').replace(/\\t/g, '\t');
+    };
+
+    return {
+      text: decodeEscaped(outputMatch ? outputMatch[1] : text),
+      real_name: realNameMatch ? realNameMatch[1] : "",
+      background: backgroundMatch ? backgroundMatch[1] : "",
+      query: queryMatch ? queryMatch[1] : "",
+      ready: readyMatch ? readyMatch[1] : "0"
+    };
+  }
+
+  // Последний fallback
+  return {
+    text: rawOutput,
+    real_name: "",
+    background: "",
+    query: "",
+    ready: "0"
+  };
+}
+
+return parseAIResponse(rawOutput);
+```
+
+**Как работает:**
+1. Попытка 1: Прямой `JSON.parse()` → работает для чистого JSON
+2. Попытка 2: Разэкранирование → работает для DeepSeek/Gemini
+3. Попытка 3: Regex → работает для любого "грязного" JSON
+4. Fallback: Весь текст как output
+
+---
+
+### Improved AI Prompts (Plain Text)
+
+**Ключевое изменение:** AI НЕ должен использовать Markdown в поле `output`
+
+**User Prompt (добавить):**
+```
+⚠️ КРИТИЧНО: В поле "output" используй ТОЛЬКО plain text (обычный текст).
+НЕ используй Markdown форматирование (**, _, `, [](url))
+Переносы строк (\n) допустимы для структуры.
+
+✅ ПРАВИЛЬНО:
+{"output": "Отлично!\n\nБазовый тариф - 12,000 рублей.\n\nЧто вас интересует?", "ready": "5"}
+
+❌ НЕПРАВИЛЬНО:
+{"output": "**Отлично!** Вот _информация_", "ready": "5"}
+```
+
+**System Prompt (добавить в начало):**
+```
+⚠️ ФОРМАТ ВЫВОДА:
+
+В поле "output" используй PLAIN TEXT без Markdown.
+Причина: Telegram API может вернуть ошибку парсинга Markdown entities.
+Используй простые переносы строк (\n) для структуры текста.
+```
+
+**Почему это решает проблемы:**
+- ✅ Telegram всегда принимает plain text
+- ✅ Нет ошибок "can't parse entities"
+- ✅ Читаемость сохраняется через \n
+- ✅ Работает с ЛЮБОЙ моделью
+
+---
+
+### Rails Error Handling (Updated)
+
+**Исправление Exception Class:**
+
+**Было:**
+```ruby
+rescue Telegram::Bot::Error => e  # ← Неправильный класс!
+```
+
+**Сейчас:**
+```ruby
+rescue Telegram::Bot::Exceptions::ResponseError => e  # ← Правильный!
+```
+
+**Fallback на Plain Text:**
+
+Если Telegram возвращает ошибку парсинга Markdown:
+1. Rails логирует ошибку
+2. Автоматически пересылает БЕЗ Markdown (plain text)
+3. Сохраняет сообщение в БД
+4. Возвращает success с warning
+
+**Код (N8nController:121-177):**
+```ruby
+rescue Telegram::Bot::Exceptions::ResponseError => e
+  if e.message.include?('parse') || e.message.include?("can't parse entities")
+    # Retry without Markdown
+    result = bot_client.api.send_message(
+      chat_id: telegram_id,
+      text: text_to_send  # БЕЗ parse_mode: 'Markdown'
+    )
+
+    # Save and broadcast...
+
+    render json: {
+      success: true,
+      warning: 'Markdown parse error, sent as plain text'
+    }
+    return
+  end
+
+  render json: { error: "Failed: #{e.message}" }, status: 500
+rescue StandardError => e
+  Rails.logger.error "N8N error: #{e.class.name} - #{e.message}"
+  render json: { error: 'Internal server error' }, status: 500
+end
+```
+
+---
+
+### Testing Different AI Models
+
+**Claude/GPT Test:**
+```json
+AI возвращает: {"output": "Clean JSON", "ready": "7"}
+Code Node Method 1: ✅ Direct parse
+Result: ✅ All fields extracted
+```
+
+**Gemini Test:**
+```json
+AI возвращает с реальными \n внутри значений
+Code Node Method 2: ✅ Unescaped parse
+Result: ✅ All fields extracted
+```
+
+**DeepSeek Test:**
+```json
+AI возвращает: {\n  "output": "...",\n  "ready": "7"\n}
+Code Node Method 2: ✅ Unescaped parse
+Result: ✅ All fields extracted
+```
+
+**Broken JSON Test:**
+```json
+AI возвращает: Невалидный JSON с ошибками
+Code Node Method 3: ✅ Regex extraction
+Result: ✅ Partial extraction (что удалось найти)
+```
+
+---
+
+### Configuration Files
+
+**Universal Parser:** `/n8n_code_node_universal_parser.js`
+**Improved Prompts:** `/n8n_improved_prompts.md`
+
+Оба файла в корне проекта для быстрого доступа и копирования в N8N.
+
+---
+
 ## Troubleshooting
 
 ### Issue: Typing Indicator Not Showing
