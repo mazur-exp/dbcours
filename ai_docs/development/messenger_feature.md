@@ -820,13 +820,194 @@ sendMessage(event) {
 
 ---
 
+## AI Qualification Display
+
+### Overview
+
+The messenger dashboard includes an AI-powered lead qualification section that automatically extracts and displays customer information as the AI learns about them through conversation.
+
+**Status:** ✅ Active (Added October 12, 2025)
+
+---
+
+### UI Components
+
+**Location:** Right sidebar in `/messenger` (when conversation selected)
+
+**File:** `app/views/messenger/index.html.erb` (Lines 142-224)
+
+**Visual Design:**
+- Gradient purple-to-blue background (`from-purple-50 to-blue-50`)
+- Purple-themed icons and labels
+- Appears between "Информация" and "Статистика" sections
+- Auto-hides if no qualification data present
+
+---
+
+### Fields Displayed
+
+#### 1. Real Name (👤 Имя)
+- AI-extracted real name if different from Telegram `first_name`
+- Example: Telegram shows "Alex" → AI extracts "Александр" from conversation
+- Displayed with purple user icon
+
+#### 2. Background (💼 Бэкграунд)
+- Customer's business context and current situation
+- Example: "Владеет рестораном в Москве, планирует открыть доставку на Бали"
+- Helps admin understand customer's context
+
+#### 3. Query (❓ Запрос/Цель)
+- Customer's main question or goal
+- Example: "Хочет понять стоимость и сроки запуска доставки"
+- Shows what customer wants to achieve
+
+#### 4. Ready Score (⚡ Готовность к покупке)
+- Lead readiness score on 0-10 scale
+- Color-coded badges with labels:
+  - **🔴 0-3** - Холодный лид (red badge, bg-red-100 text-red-800)
+  - **🟡 4-7** - Тёплый лид (yellow badge, bg-yellow-100 text-yellow-800)
+  - **🟢 8-10** - Горячий лид (green badge, bg-green-100 text-green-800)
+- Displays score numerically: "7/10"
+
+---
+
+### Data Source
+
+**Backend:** `N8nController#send_message` (app/controllers/n8n_controller.rb:28-34)
+
+AI response from N8N includes parameters:
+```ruby
+{
+  text: "Message for customer",
+  real_name: "Александр",
+  background: "Restaurant owner in Moscow",
+  query: "Course pricing and timeline",
+  ready: "7"
+}
+```
+
+**Saved to Conversation:**
+```ruby
+conversation.update!(
+  ai_real_name: params[:real_name],
+  ai_background: params[:background],
+  ai_query: params[:query],
+  ai_ready_score: params[:ready]
+)
+```
+
+---
+
+### Real-Time Updates
+
+**Update Trigger:** AI sends response via N8N → Rails
+
+**Data Flow:**
+1. User sends message in Telegram
+2. AI analyzes conversation history
+3. AI generates response with qualification data
+4. N8N sends to Rails with separate parameters
+5. Rails saves AI data to `conversation` table
+6. Page refresh shows updated qualification
+
+**Future Enhancement:** Real-time update via ActionCable broadcast (no refresh needed)
+
+---
+
+### Use Cases
+
+**Sales Prioritization:**
+```ruby
+# Find hot leads (ready to buy)
+hot_leads = Conversation.where('ai_ready_score >= 8').includes(:user)
+```
+
+**Lead Segmentation:**
+```ruby
+# Segment by readiness
+cold = Conversation.where('ai_ready_score <= 3')   # Need nurturing
+warm = Conversation.where('ai_ready_score BETWEEN 4 AND 7')  # Active engagement
+hot = Conversation.where('ai_ready_score >= 8')    # Close to purchase
+```
+
+**Context for Responses:**
+- Admin can see customer background before responding
+- Query field shows what customer is trying to achieve
+- Ready score helps prioritize which conversations to handle first
+
+---
+
+### Visual Example
+
+```erb
+<div class="bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg p-4 border border-purple-100">
+  <h4 class="text-sm font-semibold text-purple-700 flex items-center gap-2">
+    🤖 AI Квалификация
+  </h4>
+
+  <div class="space-y-3">
+    <!-- Real Name -->
+    <div>
+      <p class="text-xs text-purple-600">👤 Имя</p>
+      <p class="text-sm font-medium">Александр</p>
+    </div>
+
+    <!-- Background -->
+    <div>
+      <p class="text-xs text-purple-600">💼 Бэкграунд</p>
+      <p class="text-sm">Владеет рестораном в Москве, планирует открыть на Бали</p>
+    </div>
+
+    <!-- Query -->
+    <div>
+      <p class="text-xs text-purple-600">❓ Запрос/Цель</p>
+      <p class="text-sm">Стоимость и сроки запуска доставки</p>
+    </div>
+
+    <!-- Ready Score with Badge -->
+    <div>
+      <p class="text-xs text-purple-600">⚡ Готовность к покупке</p>
+      <div class="flex items-center gap-2">
+        <span class="px-3 py-1.5 rounded-full bg-yellow-100 text-yellow-800">
+          🟡 Тёплый лид
+        </span>
+        <span class="text-lg font-bold">7/10</span>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+---
+
+### Integration with AI Auto-Responder
+
+**Related Documentation:** See `ai_auto_responder.md` for:
+- How AI extracts qualification data
+- N8N workflow configuration
+- Prompt engineering for data extraction
+- Backend processing details
+
+**Data Flow:**
+```
+User Message → AI Analysis → N8N → Rails (N8nController)
+                                      ↓
+                            Save to conversation fields
+                                      ↓
+                            Display in messenger dashboard
+```
+
+---
+
 ## Conclusion
 
-The messenger feature provides a complete admin communication interface integrated with Telegram. Real-time WebSocket updates ensure instant message delivery, while avatar synchronization creates a polished user experience. The architecture is scalable and can be extended with rich media, search, templates, and other advanced features as needed.
+The messenger feature provides a complete admin communication interface integrated with Telegram. Real-time WebSocket updates ensure instant message delivery, while avatar synchronization creates a polished user experience. The new AI qualification display gives admins instant visibility into lead quality and customer context, enabling prioritized and personalized responses.
 
 **Key Achievements:**
 - Two-way real-time messaging
 - Avatar synchronization from Telegram
+- **AI-powered lead qualification** ✨
+- **Color-coded readiness scoring** ✨
 - Clean Stimulus-based architecture
 - Admin access control
 - Graceful error handling

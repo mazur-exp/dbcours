@@ -506,13 +506,21 @@ Content-Type: application/json
 
 {
   "telegram_id": 987654321,
-  "text": "**Great question!** The course costs $199...\n\nHere's what you get:\n• Module 1\n• Module 2"
+  "text": "**Great question!** The course costs $199...\n\nHere's what you get:\n• Module 1\n• Module 2",
+  "real_name": "Александр",
+  "background": "Restaurant owner in Moscow, planning Bali delivery",
+  "query": "Course pricing and timeline",
+  "ready": "7"
 }
 ```
 
 **Request Fields:**
 - `telegram_id` (required) - User's Telegram ID
-- `text` (required) - Message text (supports Markdown)
+- `text` (required) - Message text to send to user (supports Markdown)
+- `real_name` (optional) - AI-extracted real name of customer
+- `background` (optional) - Customer's business context/situation
+- `query` (optional) - Customer's main question or goal
+- `ready` (optional) - Lead readiness score (0-10 scale, where 10 = ready to buy now)
 
 **Markdown Support:**
 - `**bold**` → bold
@@ -553,50 +561,18 @@ Content-Type: application/json
 - `422 Unprocessable Entity` - Missing required parameters
 - `500 Internal Server Error` - Telegram API failed
 
-**AI Response Parsing:**
-
-The endpoint intelligently parses AI responses that may include JSON:
-
-**Format 1: JSON code block**
-```
-```json
-{
-  "output": "Your message here",
-  "real_name": "Alex",
-  "background": "Restaurant owner",
-  "query": "Course pricing",
-  "ready": 85
-}
-```
-```
-
-**Format 2: Plain JSON**
-```json
-{
-  "output": "Your message here",
-  "ready": 85
-}
-```
-
-**Format 3: Plain text (fallback)**
-```
-Just plain text, no JSON
-```
-
-**Parsed Fields:**
-- `output` (required) - Message text sent to user
-- `real_name` (optional) - User's real name → saved to conversation.ai_real_name
-- `background` (optional) - Business context → saved to conversation.ai_background
-- `query` (optional) - Main question → saved to conversation.ai_query
-- `ready` (optional) - Readiness score 0-100 → saved to conversation.ai_ready_score
-
 **Side Effects:**
-- Sends message to user via Telegram API
+- Sends `text` to user via Telegram API with Markdown formatting
 - Saves message to database (direction: outgoing, user_id: nil)
 - **Stops typing indicator** - Sets conversation.ai_processing = false
-- Saves AI qualification data to conversation
-- Broadcasts to MessengerChannel (admin sees message in real-time)
+- **Saves AI qualification data** to conversation:
+  - `real_name` → `conversation.ai_real_name`
+  - `background` → `conversation.ai_background`
+  - `query` → `conversation.ai_query`
+  - `ready` → `conversation.ai_ready_score`
+- Broadcasts to MessengerChannel (admin sees message + qualification in real-time)
 - Updates conversation last_message_at timestamp
+- **Displays in messenger dashboard** - AI data shown in right sidebar with color-coded badges
 
 **Error Handling:**
 
@@ -608,20 +584,26 @@ Just plain text, no JSON
 **Example N8N Workflow Configuration:**
 
 ```javascript
-// N8N HTTP Request node
+// N8N HTTP Request node (after Code node that extracts AI fields)
 {
   "method": "POST",
-  "url": "https://your-domain.com/api/n8n/send_message",
+  "url": "{{ $node['Webhook'].json.callback_url }}",
   "headers": {
     "Authorization": "Bearer {{$env.N8N_API_TOKEN}}",
     "Content-Type": "application/json"
   },
   "body": {
-    "telegram_id": "{{$json.user.telegram_id}}",
-    "text": "{{$json.ai_response}}"
+    "telegram_id": "{{ $node['Webhook'].json.user.telegram_id }}",
+    "text": "{{ $json.text }}",
+    "real_name": "{{ $json.real_name }}",
+    "background": "{{ $json.background }}",
+    "query": "{{ $json.query }}",
+    "ready": "{{ $json.ready }}"
   }
 }
 ```
+
+**Note:** Requires Code node before HTTP Request to extract fields from AI JSON response. See `ai_auto_responder.md` for Code node implementation.
 
 **Security Note:**
 
