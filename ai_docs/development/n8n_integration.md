@@ -41,12 +41,17 @@ n8n:
   webhook_url:
     test: https://n8n.aidelivery.tech/webhook-test/6d426ce1-6e61-42dd-96e3-ca96969f4c51
     production: https://n8n.aidelivery.tech/webhook/6d426ce1-6e61-42dd-96e3-ca96969f4c51
+
+telegram:
+  api_base_url: https://crm.aidelivery.tech  # or http://localhost:3000 for dev
+  # ... other telegram config
 ```
 
 **Fields:**
 - `api_token` - JWT token for N8N API authentication
 - `webhook_url.test` - Webhook endpoint for development/test environments
 - `webhook_url.production` - Webhook endpoint for production environment
+- **`telegram.api_base_url`** ✨ NEW - Base URL for callback routing (enables automatic dev/prod switching)
 
 ---
 
@@ -236,6 +241,7 @@ end
   "text": "Hello, I have a question about the course",
   "timestamp": "2025-01-09T14:30:00Z",
   "conversation_id": 45,
+  "callback_url": "https://crm.aidelivery.tech/api/n8n/send_message",
   "user": {
     "id": 12,
     "telegram_id": 987654321,
@@ -255,8 +261,12 @@ end
 - `text` - Current message text
 - `timestamp` - Message creation time (ISO 8601)
 - `conversation_id` - Conversation ID
+- **`callback_url`** ✨ NEW - Environment-specific API endpoint for sending responses back
+  - Development: `http://localhost:3000/api/n8n/send_message`
+  - Production: `https://crm.aidelivery.tech/api/n8n/send_message`
+  - **Single N8N workflow works for both environments** - no URL hardcoding needed!
 - `user` - Full user profile data
-- **`conversation_history`** ✨ NEW - Last 50 messages formatted as text (newest last)
+- **`conversation_history`** ✨ - Last 50 messages formatted as text (newest last)
   - Format: `[YYYY-MM-DD HH:MM] Sender: message text`
   - Sender: "Сотрудник" for staff, "Клиент [Name]" for customer
   - Perfect for AI context and automated responses
@@ -276,10 +286,73 @@ end
 - ✅ Excludes /start command (handled separately for auth)
 - ✅ Includes full user context (ID, Telegram ID, username, avatar)
 - ✅ **Conversation history** - Last 50 messages for AI context
+- ✅ **Callback URL** - Dynamic environment routing (dev/prod)
 - ✅ Environment-aware (test vs production webhook URLs)
 - ✅ Error handling (N8N failures don't break messenger)
 - ✅ Request timeout: 5 seconds
 - ✅ Bearer token authentication
+
+---
+
+### 🔄 Callback URL: Automatic Environment Routing ✨
+
+**Problem Solved:**
+Before `callback_url`, N8N workflows needed hardcoded URLs like `https://crm.aidelivery.tech/api/n8n/send_message`. This meant:
+- ❌ Separate workflows for development and production
+- ❌ Manual URL changes when testing
+- ❌ Risk of accidentally hitting production from dev environment
+- ❌ Workflow duplication and maintenance overhead
+
+**Solution:**
+Now Rails includes `callback_url` in every webhook payload, automatically determined from `telegram.api_base_url` credential:
+
+```ruby
+# app/controllers/auth_controller.rb (lines 357-359, 368)
+api_base_url = Rails.application.credentials.dig(:telegram, :api_base_url)
+callback_url = "#{api_base_url}/api/n8n/send_message"
+
+payload = {
+  # ...
+  callback_url: callback_url,  # Auto-switches based on environment
+  # ...
+}
+```
+
+**N8N Configuration:**
+In your HTTP Request node, simply use:
+```
+URL: {{ $node["Webhook"].json.callback_url }}
+```
+
+**Result:**
+- ✅ **Development:** Webhook → `http://localhost:3000/api/n8n/send_message`
+- ✅ **Production:** Webhook → `https://crm.aidelivery.tech/api/n8n/send_message`
+- ✅ **Single workflow** works everywhere
+- ✅ **Zero configuration** when deploying
+
+**Setup:**
+```bash
+# Edit credentials
+EDITOR="code --wait" bin/rails credentials:edit
+
+# Add api_base_url
+telegram:
+  api_base_url: http://localhost:3000  # Development
+  # ...
+
+# For production credentials
+EDITOR="code --wait" bin/rails credentials:edit --environment production
+
+telegram:
+  api_base_url: https://crm.aidelivery.tech  # Production
+  # ...
+```
+
+**Benefits:**
+- 🚀 **Deploy once, use everywhere** - N8N workflow works on any environment
+- 🔒 **Environment isolation** - Dev webhooks never hit production
+- 🎯 **No human error** - URLs automatically correct
+- ⚡ **Faster testing** - Switch environments without touching N8N
 
 **Security:**
 - Uses encrypted credentials (N8N_API_TOKEN, N8N_WEBHOOK_URL)
@@ -594,7 +667,7 @@ Content-Type: application/json
    - Include: conversation_history for context
 4. **HTTP Request Node** - POST to Rails `/api/n8n/send_message`
    - Method: POST
-   - URL: `{{$env.RAILS_URL}}/api/n8n/send_message`
+   - **URL: `{{ $node["Webhook"].json.callback_url }}`** ✨ Dynamic environment routing!
    - Headers:
      - `Authorization: Bearer {{$env.N8N_API_TOKEN}}`
      - `Content-Type: application/json`
@@ -605,6 +678,11 @@ Content-Type: application/json
        "text": {{$json.ai_response}}
      }
      ```
+   - **Benefits:**
+     - ✅ Single workflow for dev + production
+     - ✅ No hardcoded URLs
+     - ✅ Automatic environment switching
+     - ✅ No workflow duplication needed
 5. **Airtable/Database Node** (optional) - log AI interactions
 
 **Example AI Prompt:**

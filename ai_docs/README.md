@@ -195,7 +195,24 @@ ai_docs/
 
 ---
 
-### 4. api_endpoints.md
+### 4. telegram_credentials.md
+**Purpose:** Secure Telegram Bot credentials management
+
+**Contents:**
+- Environment-specific credentials (development vs production)
+- Rails encrypted credentials structure
+- Bot tokens and webhook URLs
+- **api_base_url field** ✨ - For N8N callback routing
+- Initializer configuration (telegram_bot.rb)
+- Bitwarden CLI integration patterns
+- Security best practices
+- Setup instructions and verification
+
+**Use When:** Setting up new environments, managing bot credentials, configuring N8N integrations, rotating API tokens
+
+---
+
+### 5. api_endpoints.md
 **Purpose:** Complete API reference
 
 **Contents:**
@@ -208,7 +225,7 @@ ai_docs/
 
 ---
 
-### 5. frontend_architecture.md
+### 6. frontend_architecture.md
 **Purpose:** Frontend implementation details
 
 **Contents:**
@@ -222,7 +239,7 @@ ai_docs/
 
 ---
 
-### 6. content_management.md
+### 7. content_management.md
 **Purpose:** Markdown-based content system
 
 **Contents:**
@@ -236,21 +253,24 @@ ai_docs/
 
 ---
 
-### 7. deployment.md
+### 8. deployment.md
 **Purpose:** Complete deployment guide
 
 **Contents:**
-- Kamal configuration (config/deploy.yml)
+- Kamal configuration (config/deploy.yml, ghcr.io registry)
+- Bitwarden CLI integration for secrets management
+- ARM64 architecture configuration
+- Environment-specific credentials (production.key vs master.key)
 - Initial server setup
 - Standard deployment workflow
 - Database management (migrations, backups)
 - Logs, monitoring, rollbacks
 
-**Use When:** Deploying changes, troubleshooting production issues, setting up new servers
+**Use When:** Deploying changes, troubleshooting production issues, setting up new servers, managing secrets
 
 ---
 
-### 8. known_issues_and_solutions.md
+### 9. known_issues_and_solutions.md
 **Purpose:** Documented bugs and their fixes
 
 **Contents:**
@@ -260,13 +280,14 @@ ai_docs/
 - Issue #4: Content accessible without auth (page load check solution)
 - Issue #5: Blur on wrong elements (targeted wrapper solution)
 - Issue #10: Dropdown menu not working after page refresh (Stimulus controller solution)
+- Issue #11: N8N workflows require hardcoded environment URLs (callback_url solution)
 - Plus 4 more documented issues
 
 **Use When:** Debugging similar issues, understanding past decisions, preventing regressions
 
 ---
 
-### 9. messenger_feature.md
+### 10. messenger_feature.md
 **Purpose:** Complete real-time messenger implementation documentation
 
 **Contents:**
@@ -284,7 +305,7 @@ ai_docs/
 
 ---
 
-### 10. ai_auto_responder.md
+### 11. ai_auto_responder.md
 **Purpose:** AI-powered auto-responder with typing indicator documentation
 
 **Contents:**
@@ -304,13 +325,14 @@ ai_docs/
 
 ---
 
-### 11. n8n_integration.md
+### 12. n8n_integration.md
 **Purpose:** N8N workflow automation platform integration
 
 **Contents:**
 - N8N configuration (credentials, webhook URLs)
+- **Callback URL feature** ✨ - Automatic environment routing (dev/prod)
 - Event types (user_registered, message_received, purchase_completed)
-- Webhook payload structures
+- Webhook payload structures (includes callback_url)
 - Conversation history format (50 messages for AI context)
 - Bi-directional integration (Rails → N8N, N8N → Rails)
 - POST /api/n8n/send_message endpoint documentation
@@ -319,7 +341,7 @@ ai_docs/
 - Security (Bearer token authentication)
 - Error handling and retry logic
 
-**Use When:** Setting up N8N workflows, integrating AI responses, debugging webhooks, understanding automation flows
+**Use When:** Setting up N8N workflows, integrating AI responses, debugging webhooks, understanding automation flows, configuring environment-specific routing
 
 ---
 
@@ -432,8 +454,8 @@ ai_docs/
 ### File Count
 - **Business:** 5 files
 - **UI:** 4 files
-- **Development:** 11 files
-- **Total:** 20 documentation files
+- **Development:** 12 files
+- **Total:** 21 documentation files
 
 ### Total Word Count
 - **Approximate:** 75,000+ words
@@ -441,7 +463,7 @@ ai_docs/
 
 ### Last Updated
 - **Initial Creation:** January 2025
-- **Last Major Update:** October 10, 2025 (AI Auto-Responder, complete Messenger & N8N docs)
+- **Last Major Update:** January 12, 2025 (Callback URL feature, Kamal deployment updates, PWA implementation)
 - **Update Frequency:** After each major feature release
 
 ---

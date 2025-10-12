@@ -725,6 +725,88 @@ Deleted ~60 lines of dropdown logic from `_auth_script.html.erb`:
 
 ---
 
+## Issue #11: N8N Workflows Require Hardcoded Environment URLs
+
+### Problem
+
+**Symptom:**
+- N8N workflow configured for development (`http://localhost:3000`)
+- Same workflow copied/duplicated for production (`https://crm.aidelivery.tech`)
+- Manual URL changes required when promoting workflows
+- Risk of accidentally using wrong URL (dev workflow hitting production)
+- Maintenance overhead (two identical workflows with different URLs)
+
+**Root Cause:**
+- N8N HTTP Request nodes require static URLs
+- No dynamic environment detection in N8N workflows
+- Rails webhook payload didn't include target URL for responses
+
+**Original Implementation:**
+```javascript
+// N8N HTTP Request node (static URL)
+POST https://crm.aidelivery.tech/api/n8n/send_message
+Headers: Authorization: Bearer {{$env.N8N_API_TOKEN}}
+Body: {"telegram_id": 123, "text": "..."}
+```
+
+**Problems:**
+- ❌ Separate workflow needed for each environment
+- ❌ Manual URL updates when deploying
+- ❌ Easy to forget URL change → wrong environment hit
+- ❌ Workflow duplication (2x maintenance)
+
+---
+
+### Solution
+
+**Dynamic Callback URL in Webhook Payload:**
+
+**Backend Changes (auth_controller.rb:357-368):**
+```ruby
+# Get environment-specific API base URL from credentials
+api_base_url = Rails.application.credentials.dig(:telegram, :api_base_url)
+callback_url = "#{api_base_url}/api/n8n/send_message"
+
+payload = {
+  event: 'message_received',
+  callback_url: callback_url,  # Dynamic URL based on environment
+  # ... other fields
+}
+```
+
+**Credentials Structure:**
+```yaml
+# Development (config/credentials.yml.enc)
+telegram:
+  api_base_url: http://localhost:3000
+
+# Production (config/credentials/production.yml.enc)
+telegram:
+  api_base_url: https://crm.aidelivery.tech
+```
+
+**N8N Configuration (HTTP Request node):**
+```javascript
+// Dynamic URL from webhook payload
+POST {{ $node["Webhook"].json.callback_url }}
+Headers: Authorization: Bearer {{$env.N8N_API_TOKEN}}
+Body: {"telegram_id": {{$json.user.telegram_id}}, "text": "..."}
+```
+
+**Result:**
+- ✅ Single N8N workflow for all environments
+- ✅ No manual URL configuration
+- ✅ Automatic environment detection
+- ✅ Zero-config deployment (works immediately in dev/prod)
+- ✅ No risk of environment confusion
+
+**Implementation Details:**
+- **File:** `app/controllers/auth_controller.rb` (lines 357-359, 368)
+- **Credentials:** `telegram.api_base_url` in both `credentials.yml.enc` and `production.yml.enc`
+- **Documentation:** See `ai_docs/development/n8n_integration.md` (section "Callback URL: Automatic Environment Routing")
+
+---
+
 ## Known Limitations (Not Issues)
 
 ### SQLite Concurrency

@@ -10,22 +10,59 @@ Telegram Bot credentials are stored securely in Rails encrypted credentials file
 
 ## Credentials Structure
 
-### Location
+### Environment-Specific Configuration
 
-Credentials are stored in `config/credentials.yml.enc` (encrypted):
+The application uses separate encrypted credentials for development and production environments:
+
+- **Development**: `config/credentials.yml.enc` (decrypted with `config/master.key`)
+- **Production**: `config/credentials/production.yml.enc` (decrypted with `config/credentials/production.key`)
+
+### Development Credentials
+
+**File:** `config/credentials.yml.enc`
 
 ```yaml
 telegram:
   bot_token: 8414411793:AAE_Onhi-g_9zxp_krmkApdnj9TI6tSm8Qg
   bot_username: dbcourse_auth_bot
   webhook_url: https://karri-unexpunged-becomingly.ngrok-free.dev/auth/telegram/webhook
+  api_base_url: http://localhost:3000  # ✨ For N8N callback routing
 ```
+
+**Bot:** [@dbcourse_auth_bot](https://t.me/dbcourse_auth_bot)
+**Webhook:** ngrok URL (changes on ngrok restart)
+**API Base:** Local development server
+
+---
+
+### Production Credentials
+
+**File:** `config/credentials/production.yml.enc`
+
+```yaml
+telegram:
+  bot_token: 8243168970:AAEq9-4_rpgahzBdwMq98wYKAcklJxJgDu8
+  bot_username: ai_delivery_tech_assistent_bot
+  webhook_url: https://crm.aidelivery.tech/auth/telegram/webhook
+  api_base_url: https://crm.aidelivery.tech  # ✨ For N8N callback routing
+```
+
+**Bot:** [@ai_delivery_tech_assistent_bot](https://t.me/ai_delivery_tech_assistent_bot)
+**Webhook:** https://crm.aidelivery.tech/auth/telegram/webhook (production domain)
+**API Base:** Production server URL
+
+---
 
 ### Fields
 
 - **`bot_token`** - Telegram Bot API token from [@BotFather](https://t.me/BotFather)
 - **`bot_username`** - Bot username (without @ symbol)
 - **`webhook_url`** - Public URL for receiving Telegram webhook updates
+- **`api_base_url`** ✨ NEW - Base URL for N8N callback routing
+  - Used to construct `callback_url` sent to N8N webhooks
+  - Enables single N8N workflow to work across dev/prod environments
+  - Development: `http://localhost:3000`
+  - Production: `https://crm.aidelivery.tech`
 
 ---
 
@@ -58,8 +95,14 @@ end
 
 ### 1. Edit Encrypted Credentials
 
+**Development:**
 ```bash
 EDITOR="code --wait" bin/rails credentials:edit
+```
+
+**Production:**
+```bash
+EDITOR="code --wait" bin/rails credentials:edit --environment production
 ```
 
 Add the following structure:
@@ -69,9 +112,12 @@ telegram:
   bot_token: YOUR_BOT_TOKEN_FROM_BOTFATHER
   bot_username: your_bot_username
   webhook_url: https://your-domain.com/auth/telegram/webhook
+  api_base_url: https://your-domain.com  # Production URL (or http://localhost:3000 for dev)
 ```
 
 **Important:** Save the file (Cmd+S / Ctrl+S) and close the editor. Credentials will be automatically encrypted.
+
+**Note:** The `api_base_url` field is required for N8N integration callback routing. It allows N8N workflows to automatically use the correct API endpoint based on the environment.
 
 ---
 
@@ -182,7 +228,7 @@ end
 
 ### Kamal Configuration
 
-Credentials are automatically deployed with the application:
+Production credentials are automatically deployed with the application:
 
 ```yaml
 # config/deploy.yml
@@ -191,16 +237,45 @@ env:
     - RAILS_MASTER_KEY
 ```
 
-The `RAILS_MASTER_KEY` environment variable must be set on the server to decrypt credentials.
+**Important:** In production, use `config/credentials/production.key` instead of `config/master.key`
 
-### Setting Master Key on Server
+### Setting Production Key on Server
 
+**Option 1: Via Kamal secrets (.kamal/secrets)**
 ```bash
-# Option 1: Via Kamal secrets
-bin/kamal env set RAILS_MASTER_KEY=$(cat config/master.key)
+# .kamal/secrets
+RAILS_MASTER_KEY=$(cat config/credentials/production.key)
+```
 
-# Option 2: Manual deployment
-# Add to server's .env file or environment
+**Option 2: Manual export**
+```bash
+export RAILS_MASTER_KEY=$(cat config/credentials/production.key)
+bin/kamal deploy
+```
+
+### Webhook Configuration
+
+**Production Webhook Setup:**
+```bash
+# Set webhook on Telegram servers (after deploying bot)
+curl -X POST "https://api.telegram.org/bot8243168970:AAEq9-4_rpgahzBdwMq98wYKAcklJxJgDu8/setWebhook" \
+  -d "url=https://crm.aidelivery.tech/auth/telegram/webhook"
+
+# Verify webhook is set
+curl "https://api.telegram.org/bot8243168970:AAEq9-4_rpgahzBdwMq98wYKAcklJxJgDu8/getWebhookInfo"
+```
+
+**Development Webhook Setup (ngrok):**
+```bash
+# Start ngrok
+ngrok http 3000
+
+# Copy ngrok URL, update development credentials
+EDITOR="code --wait" bin/rails credentials:edit
+
+# Set webhook
+curl -X POST "https://api.telegram.org/bot8414411793:AAE_Onhi-g_9zxp_krmkApdnj9TI6tSm8Qg/setWebhook" \
+  -d "url=https://your-ngrok-url.ngrok-free.dev/auth/telegram/webhook"
 ```
 
 ---

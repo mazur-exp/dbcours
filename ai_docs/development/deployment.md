@@ -26,45 +26,57 @@ The application is deployed using Kamal, a Docker-based deployment tool that ena
 
 ```yaml
 service: dbcours
-image: username/dbcours
+image: mazur-exp/dbcours
 
 servers:
   web:
-    - 192.168.0.1  # UPDATE THIS - your server IP
+    - 46.62.195.19
+  job:
+    hosts:
+      - 46.62.195.19
+    cmd: bin/jobs
 
 registry:
   server: ghcr.io
-  username: your-github-username
+  username: mazur-exp
   password:
     - KAMAL_REGISTRY_PASSWORD
 
 env:
   clear:
     SOLID_QUEUE_IN_PUMA: true
-    RAILS_ENV: production
   secret:
     - RAILS_MASTER_KEY
-    - TELEGRAM_BOT_TOKEN
-    - TELEGRAM_WEBHOOK_URL
 
 volumes:
-  - "dbcours_storage:/rails/storage"
+  - "aidelivery:/rails/storage"
 
 # Asset compilation
 asset_path: /rails/public/assets
 
-# Health check
-healthcheck:
-  path: /up
-  interval: 10s
-
 # Proxy (Thruster - HTTP/2)
 proxy:
   ssl: true
-  host: your-domain.com
-  acme:
-    email: your-email@example.com
+  host: crm.aidelivery.tech
+
+# Build configuration
+builder:
+  arch: arm64
+
+# SSH configuration
+ssh:
+  user: root
+  port: 2222
 ```
+
+**Key Configuration Points:**
+
+- **Registry:** GitHub Container Registry (`ghcr.io`)
+- **Image:** `mazur-exp/dbcours`
+- **Architecture:** `arm64` (Apple Silicon optimized)
+- **Server:** Dedicated job server for Solid Queue
+- **SSH:** Custom port 2222 for security
+- **SSL:** Auto-configured via Let's Encrypt (no email needed)
 
 ---
 
@@ -136,7 +148,8 @@ bin/kamal deploy
    - Builds Tailwind CSS
 
 2. **Push to Registry:**
-   - Pushes image to Docker registry (GitHub Container Registry)
+   - Pushes image to GitHub Container Registry (ghcr.io)
+   - Uses Bitwarden-managed credentials for authentication
 
 3. **Pull on Server:**
    - Server pulls latest image from registry
@@ -371,28 +384,73 @@ bin/kamal rollback <VERSION>
 
 ### Managing Secrets
 
-**Encrypted Credentials:**
+**Bitwarden CLI Integration (`.kamal/secrets`):**
+
+The project uses Bitwarden CLI for secure secrets management:
+
 ```bash
-# Edit production credentials
-bin/rails credentials:edit --environment production
+# Fetch registry password from Bitwarden
+KAMAL_REGISTRY_PASSWORD=$(bw get item "DT Secret" | jq -r '.fields[] | select(.name =="git_pat") | .value')
+
+# Use production credentials key (NOT master.key)
+RAILS_MASTER_KEY=$(cat config/credentials/production.key)
 ```
 
-**Example:**
+**Prerequisites:**
+```bash
+# Install Bitwarden CLI
+brew install bitwarden-cli  # macOS
+# or: npm install -g @bitwarden/cli
+
+# Login to Bitwarden
+bw login
+
+# Unlock vault (save session key)
+export BW_SESSION="your-session-key"
+```
+
+**Security Benefits:**
+- ✅ Never commit secrets to git
+- ✅ Centralized secret management via Bitwarden
+- ✅ Team access control
+- ✅ Audit trail for secret access
+- ✅ Environment-specific credentials (production.key vs master.key)
+
+---
+
+### Encrypted Credentials (Rails)
+
+**Edit Production Credentials:**
+```bash
+# Uses config/credentials/production.key (NOT master.key)
+EDITOR="code --wait" bin/rails credentials:edit --environment production
+```
+
+**Example Structure:**
 ```yaml
 telegram:
   bot_token: "8414411793:AAE_Onhi-g_9zxp_krmkApdnj9TI6tSm8Qg"
   bot_username: "dbcourse_auth_bot"
-  webhook_url: "https://your-domain.com/auth/telegram/webhook"
+  webhook_url: "https://crm.aidelivery.tech/auth/telegram/webhook"
+
+n8n:
+  webhook_url: "https://n8n.aidelivery.tech/webhook/..."
+  auth_token: "your-bearer-token"
+  api_base_url: "https://crm.aidelivery.tech"
 ```
 
 **Access in App:**
 ```ruby
+# Production
 Rails.application.credentials.telegram[:bot_token]
+
+# Development (uses master.key)
+Rails.application.credentials.dig(:telegram, :bot_token)
 ```
 
-**RAILS_MASTER_KEY:**
-- Set on server via Kamal secrets
-- Decrypts credentials.yml.enc
+**Environment-Specific Credentials:**
+- **Development:** `config/master.key` → `config/credentials.yml.enc`
+- **Production:** `config/credentials/production.key` → `config/credentials/production.yml.enc`
 
 ---
 
