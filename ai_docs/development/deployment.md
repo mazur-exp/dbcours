@@ -339,6 +339,99 @@ bin/kamal console
 
 ---
 
+## User & Admin Management
+
+### Make User an Admin
+
+**Quick Command (One-liner):**
+```bash
+bin/kamal app exec "bin/rails runner \"User.find_by(username: 'mazur_exp').update(admin: true)\""
+```
+
+**What it does:**
+- Executes Rails runner in production container
+- Finds user by Telegram username (`mazur_exp`)
+- Updates `admin` field to `true`
+- User immediately gets admin access (e.g., `/messenger` dashboard)
+
+**Via Console (Interactive):**
+```bash
+# Open Rails console
+bin/kamal console
+
+# Find user and make admin
+user = User.find_by(username: "mazur_exp")
+user.update(admin: true)
+
+# Verify
+user.admin?
+# => true
+
+# Exit console
+exit
+```
+
+---
+
+### Find User by Telegram ID
+
+If username changes or is unknown:
+
+```bash
+# One-liner
+bin/kamal app exec "bin/rails runner \"User.find_by(telegram_id: 123456789).update(admin: true)\""
+
+# Or via console
+bin/kamal console
+user = User.find_by(telegram_id: 123456789)
+user.update(admin: true)
+```
+
+**How to get Telegram ID:**
+- Use bot like [@userinfobot](https://t.me/userinfobot)
+- Or check database: `User.find_by(username: "mazur_exp").telegram_id`
+
+---
+
+### List All Admins
+
+**Check who has admin access:**
+```bash
+bin/kamal app exec "bin/rails runner \"puts User.admins.pluck(:username, :telegram_id)\""
+```
+
+**Output example:**
+```
+[["mazur_exp", 123456789], ["admin_user", 987654321]]
+```
+
+---
+
+### Remove Admin Access
+
+**Revoke admin rights:**
+```bash
+bin/kamal app exec "bin/rails runner \"User.find_by(username: 'username').update(admin: false)\""
+```
+
+---
+
+### Bulk Admin Operations
+
+**Make multiple users admins:**
+```bash
+bin/kamal console
+
+# Array of usernames
+usernames = ["mazur_exp", "admin2", "admin3"]
+User.where(username: usernames).update_all(admin: true)
+
+# Verify
+User.admins.pluck(:username)
+```
+
+---
+
 ## Server Access
 
 ### SSH into Server

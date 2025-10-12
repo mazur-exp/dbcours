@@ -264,9 +264,10 @@ ai_docs/
 - Initial server setup
 - Standard deployment workflow
 - Database management (migrations, backups)
+- **User & Admin management** - Commands for making users admins
 - Logs, monitoring, rollbacks
 
-**Use When:** Deploying changes, troubleshooting production issues, setting up new servers, managing secrets
+**Use When:** Deploying changes, troubleshooting production issues, setting up new servers, managing secrets, adding admins
 
 ---
 
