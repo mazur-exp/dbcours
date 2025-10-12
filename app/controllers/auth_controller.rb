@@ -354,6 +354,10 @@ class AuthController < ApplicationController
       request['Authorization'] = "Bearer #{N8N_API_TOKEN}" if N8N_API_TOKEN.present?
       request['Content-Type'] = 'application/json'
 
+      # Получаем callback URL из credentials (автоматически dev/prod)
+      api_base_url = Rails.application.credentials.dig(:telegram, :api_base_url)
+      callback_url = "#{api_base_url}/api/n8n/send_message"
+
       payload = {
         event: 'message_received',
         message_id: message.id,
@@ -361,6 +365,7 @@ class AuthController < ApplicationController
         text: message.body,
         timestamp: message.created_at.iso8601,
         conversation_id: conversation.id,
+        callback_url: callback_url,
         user: {
           id: user.id,
           telegram_id: user.telegram_id,
