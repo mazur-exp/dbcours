@@ -1,5 +1,5 @@
 <% messages.each do |message| %>
-  <div class="flex <%= message.outgoing? ? 'justify-end' : 'justify-start' %>" data-message-id="<%= message.id %>">
+  <div class="message-item flex <%= message.outgoing? ? 'justify-end' : 'justify-start' %>" data-message-id="<%= message.id %>" data-source-type="<%= message.source_type %>">
     <div class="max-w-xl <%= message.outgoing? ? 'order-2' : 'order-1' %>">
       <!-- Аватарка для входящих -->
       <% if message.incoming? %>

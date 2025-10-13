@@ -6,6 +6,129 @@ This document tracks all significant changes, features, and updates to the Bali 
 
 ---
 
+## [October 13, 2025] - Tab-Based Channel Selection UI
+
+### Added
+- **Tab-Based Channel Selection**
+  - Two tabs: 🤖 Бот and 👤 Бизнес with message counts
+  - Click to filter messages by source (bot/business)
+  - Active tab determines send channel (user selection)
+  - Auto-detection of active tab based on last message
+  - **Files:**
+    - `app/views/messenger/index.html.erb` (lines 70-87) - Tab buttons with counts
+    - `app/javascript/controllers/messenger_controller.js` (lines 36-86) - switchTab() and filterMessages() functions
+    - `app/views/messenger/_messages.html.erb` (line 2) - data-source-type attribute
+  - **Visual Design:**
+    - Active Bot tab: `bg-blue-100 text-blue-700`
+    - Active Business tab: `bg-green-100 text-green-700`
+    - Inactive tabs: `text-gray-600 hover:bg-gray-100`
+  - **Documentation:**
+    - `telegram_business_api.md` - New section "Tab-Based UI for Channel Selection"
+    - `messenger_feature.md` - New section "Channel Selection Tabs"
+
+### Changed
+- **Message Routing Logic**
+  - Changed from automatic channel detection to user-selected
+  - Admin now chooses channel via tabs instead of automatic routing based on last incoming message
+  - `params[:source_type]` passed from frontend to backend
+  - **File:** `app/controllers/messenger_controller.rb` (lines 35-54)
+  - **Before:** `source_type = last_incoming&.source_type || 'bot'`
+  - **After:** `source_type = params[:source_type] || 'bot'`
+  - **Commits:** c4d72c8 (Fix symbol vs string comparison), b97fc41 (Add automatic message routing)
+
+### Fixed
+- **Business Connection ID Path**
+  - Fixed webhook payload path to `business_message.business_connection_id`
+  - **Before:** `update["business_connection_id"]`
+  - **After:** `update["business_message"]["business_connection_id"]`
+  - **File:** `app/controllers/auth_controller.rb` (line 93)
+
+- **Improved Logging**
+  - Added emoji prefixes for better log readability
+  - 📨 for business messages
+  - 🔍 for lookups
+  - ✅ for success
+  - ❌ for errors
+  - **Files:** `auth_controller.rb` (lines 513-577), `messenger_controller.rb` (lines 156-231)
+
+### Technical Details
+
+**JavaScript Functions:**
+
+**switchTab() - Tab switching logic**
+```javascript
+// messenger_controller.js (lines 45-70)
+switchTab(event) {
+  this.activeTab = button.dataset.tab
+
+  // Update button styles
+  // Highlight active tab (blue for bot, green for business)
+  // Call filterMessages()
+}
+```
+
+**filterMessages() - Message filtering by source type**
+```javascript
+// messenger_controller.js (lines 72-86)
+filterMessages() {
+  messages.forEach(msg => {
+    if (this.activeTab === msg.dataset.sourceType) {
+      msg.style.display = 'flex'  // Show matching
+    } else {
+      msg.style.display = 'none'  // Hide non-matching
+    }
+  })
+}
+```
+
+**Auto-detection on load**
+```javascript
+// messenger_controller.js (lines 36-39)
+connect() {
+  const lastMessage = messages[messages.length - 1]
+  this.activeTab = lastMessage?.dataset.sourceType || 'bot'
+}
+```
+
+**Integration with send_message:**
+```javascript
+// messenger_controller.js (line 530)
+body: JSON.stringify({
+  body: body,
+  source_type: this.activeTab  // Передаём выбранную вкладку
+})
+```
+
+**Backend handling:**
+```ruby
+# messenger_controller.rb (lines 44-45)
+source_type = params[:source_type] || 'bot'  # User selection from tabs
+```
+
+### User Experience
+
+**Before (Automatic Routing):**
+- System automatically chose channel based on last incoming message
+- Admin had no control over which channel to use
+- Confusing when both channels were active
+
+**After (Tab-Based Selection):**
+- Admin explicitly chooses channel via tabs
+- Visual feedback with color-coded tabs
+- Message counts show activity per channel
+- Clear control over routing logic
+
+### Impact on Business API Integration
+
+This change completes the dual-channel messaging feature:
+- Admins can consciously switch between Bot and Business channels
+- Better UX for managing multiple communication channels
+- Prepares foundation for multi-business support in future
+
+See `telegram_business_api.md` for complete Business API documentation.
+
+---
+
 ## [October 12, 2025] - AI Qualification & Documentation Review
 
 ### Added
@@ -543,4 +666,4 @@ For questions, bug reports, or feature requests:
 
 ---
 
-**Last Updated:** January 12, 2025
+**Last Updated:** October 13, 2025

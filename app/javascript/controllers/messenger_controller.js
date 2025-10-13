@@ -6,6 +6,10 @@ export default class extends Controller {
     "messages",
     "input",
     "conversationsList",
+    // Tab targets
+    "tabBot",
+    "tabBotOnly",
+    "tabBusiness",
     // AI Qualification targets
     "aiQualificationSection",
     "aiQualificationContent",
@@ -28,7 +32,56 @@ export default class extends Controller {
     // Ищем именно элемент main с активным conversation-id, а не первый попавшийся
     this.activeConversationId = this.element.querySelector('main[data-conversation-id]')?.dataset.conversationId
     console.log('Active conversation ID:', this.activeConversationId)
+
+    // Определяем активную вкладку по последнему сообщению
+    const messages = this.element.querySelectorAll('.message-item')
+    const lastMessage = messages[messages.length - 1]
+    this.activeTab = lastMessage?.dataset.sourceType || 'bot'
+
     this.subscribeToChannel()
+    this.scrollToBottom()
+  }
+
+  switchTab(event) {
+    const button = event.currentTarget
+    const tab = button.dataset.tab
+
+    // Обновляем активную вкладку
+    this.activeTab = tab
+
+    // Обновляем стили кнопок
+    const allButtons = this.element.querySelectorAll('.tab-button')
+    allButtons.forEach(btn => {
+      btn.classList.remove('bg-blue-100', 'text-blue-700', 'bg-green-100', 'text-green-700')
+      btn.classList.add('text-gray-600', 'hover:bg-gray-100')
+    })
+
+    // Подсвечиваем активную
+    if (tab === 'bot') {
+      button.classList.remove('text-gray-600', 'hover:bg-gray-100')
+      button.classList.add('bg-blue-100', 'text-blue-700')
+    } else if (tab === 'business') {
+      button.classList.remove('text-gray-600', 'hover:bg-gray-100')
+      button.classList.add('bg-green-100', 'text-green-700')
+    }
+
+    // Фильтруем сообщения
+    this.filterMessages()
+  }
+
+  filterMessages() {
+    const messages = this.messagesTarget.querySelectorAll('.message-item')
+
+    messages.forEach(msg => {
+      const sourceType = msg.dataset.sourceType
+
+      if (this.activeTab === sourceType) {
+        msg.style.display = 'flex'  // Показываем совпадающие
+      } else {
+        msg.style.display = 'none'  // Скрываем несовпадающие
+      }
+    })
+
     this.scrollToBottom()
   }
 
@@ -202,13 +255,15 @@ export default class extends Controller {
       ? '<span class="text-xs text-green-600" title="Через бизнес-аккаунт">👤</span>'
       : '<span class="text-xs text-blue-600" title="Через бота">🤖</span>';
 
+    const sourceType = message.source_type || 'bot';
+
     if (isIncoming) {
       const avatarHtml = avatarUrl
         ? `<img src="${avatarUrl}" class="w-8 h-8 rounded-full object-cover flex-shrink-0" alt="${userName}" loading="lazy">`
         : `<div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0">${userLetter}</div>`
 
       return `
-        <div class="flex justify-start" data-message-id="${message.id}">
+        <div class="message-item flex justify-start" data-message-id="${message.id}" data-source-type="${sourceType}">
           <div class="max-w-xl">
             <div class="flex items-start gap-2">
               ${avatarHtml}
@@ -228,7 +283,7 @@ export default class extends Controller {
     } else {
       const bgColor = message.source_type === 'business' ? 'bg-green-500' : 'bg-blue-500';
       return `
-        <div class="flex justify-end" data-message-id="${message.id}">
+        <div class="message-item flex justify-end" data-message-id="${message.id}" data-source-type="${sourceType}">
           <div class="max-w-xl">
             <div class="flex flex-col items-end">
               <div class="${bgColor} text-white rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm">
@@ -470,7 +525,10 @@ export default class extends Controller {
           'Content-Type': 'application/json',
           'X-CSRF-Token': document.querySelector('[name="csrf-token"]').content
         },
-        body: JSON.stringify({ body: body })
+        body: JSON.stringify({
+          body: body,
+          source_type: this.activeTab  // Передаём выбранную вкладку (bot/business)
+        })
       })
 
       const data = await response.json()

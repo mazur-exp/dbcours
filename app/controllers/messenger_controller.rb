@@ -41,14 +41,13 @@ class MessengerController < ApplicationController
       return
     end
 
-    # Автоматически определяем source через какой канал пришло последнее сообщение от клиента
-    last_incoming = @conversation.messages.incoming.order(created_at: :desc).first
-    source_type = last_incoming&.source_type || :bot  # Symbol, не String!
+    # Используем source_type из параметров запроса (выбор пользователя через вкладки)
+    source_type = params[:source_type] || 'bot'
 
-    Rails.logger.info "Auto-detected source_type: #{source_type} (last incoming message: #{last_incoming&.id})"
+    Rails.logger.info "Sending message via #{source_type} channel"
 
-    # Отправляем через тот же канал что и получили
-    if source_type.to_sym == :business
+    # Отправляем через выбранный канал
+    if source_type.to_s == 'business'
       send_via_business_connection(body)
     else
       send_via_bot(body)
@@ -148,55 +147,43 @@ class MessengerController < ApplicationController
     end
   end
 
-  # DELETE /messenger/users/:id
-  def delete_user
-    # Дополнительная проверка прав админа
-    unless @current_user&.admin?
-      redirect_to messenger_path, alert: 'У вас нет прав для выполнения этого действия'
-      return
-    end
-
-    @user_to_delete = User.find_by(id: params[:id])
-
-    if @user_to_delete.nil?
-      redirect_to messenger_path, alert: 'Пользователь не найден'
-      return
-    end
-
-    # Не позволяем удалить самого себя
-    if @user_to_delete == @current_user
-      redirect_to messenger_path, alert: 'Вы не можете удалить свой аккаунт'
-      return
-    end
-
-    username = @user_to_delete.full_name
-
-    # Удаляем пользователя (каскадно удалятся conversations и messages благодаря dependent: :destroy)
-    @user_to_delete.destroy
-
-    redirect_to messenger_path, notice: "Пользователь #{username} и вся связанная информация успешно удалены"
-  end
-
   private
 
   def send_via_business_connection(body)
-    # Находим активный business connection для пользователя
-    business_conn = @conversation.user.business_connections.active_connections.first
+    # Находим последнее входящее business сообщение в этой беседе
+    last_business_msg = @conversation.messages.incoming.where(source_type: :business).order(created_at: :desc).first
 
-    unless business_conn&.can_send_messages?
-      render json: { error: 'No active business connection or cannot reply' }, status: :unprocessable_entity
+    Rails.logger.info "🔍 Looking for business connection from last incoming business message"
+    Rails.logger.info "🔍 Last business message: #{last_business_msg.inspect}"
+
+    unless last_business_msg&.business_connection_id
+      Rails.logger.error "❌ No business messages found in this conversation"
+      render json: { error: 'No business connection ID found in conversation. Client did not write through business account.' }, status: :unprocessable_entity
       return
     end
 
+    # Находим BusinessConnection по ID из входящего сообщения
+    business_conn = BusinessConnection.find_by(business_connection_id: last_business_msg.business_connection_id)
+
+    Rails.logger.info "🔍 Business connection found: #{business_conn.inspect}"
+
+    unless business_conn
+      Rails.logger.error "❌ Business connection not found by ID: #{last_business_msg.business_connection_id}"
+      render json: { error: 'Business connection not found' }, status: :unprocessable_entity
+      return
+    end
+
+    Rails.logger.info "✅ Using business connection: #{business_conn.business_connection_id}, user_chat_id: #{business_conn.user_chat_id}"
+
     begin
-      # Отправляем через Business Connection API
-      result = bot_client.api.send_business_message(
+      # Отправляем через обычный send_message с business_connection_id
+      result = bot_client.api.send_message(
         business_connection_id: business_conn.business_connection_id,
-        chat_id: business_conn.user_chat_id,
+        chat_id: @conversation.user.telegram_id,
         text: body
       )
 
-      Rails.logger.info "Business message sent: #{result.inspect}"
+      Rails.logger.info "✅ Business message sent: #{result.inspect}"
 
       # Сохраняем в БД как business message
       message = @conversation.messages.create!(
@@ -238,8 +225,9 @@ class MessengerController < ApplicationController
 
       render json: { success: true, message: message.as_json }
     rescue => e
-      Rails.logger.error "Failed to send business message: #{e.message}"
-      render json: { error: 'Failed to send business message' }, status: :unprocessable_entity
+      Rails.logger.error "❌ Failed to send business message: #{e.class} - #{e.message}"
+      Rails.logger.error "❌ Backtrace: #{e.backtrace.first(5).join("\n")}"
+      render json: { error: "Failed to send business message: #{e.message}" }, status: :unprocessable_entity
     end
   end
 

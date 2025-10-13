@@ -495,6 +495,207 @@ disconnect() {
 
 ## UI Components
 
+### Channel Selection Tabs
+
+**Status:** ✅ Implemented (October 13, 2025)
+
+**Overview:**
+Tab-based UI для выбора канала отправки сообщений (Bot или Business). Каждая вкладка показывает количество сообщений по каждому каналу и при нажатии фильтрует видимые сообщения.
+
+**Файлы:**
+- `app/views/messenger/index.html.erb` (lines 70-87) - HTML структура вкладок
+- `app/javascript/controllers/messenger_controller.js` (lines 36-86) - Логика переключения и фильтрации
+- `app/views/messenger/_messages.html.erb` (line 2) - Атрибут `data-source-type`
+
+**Визуальный дизайн:**
+
+```erb
+<!-- Вкладки для фильтрации по источнику -->
+<div class="bg-white border-b border-gray-200 px-4 py-2 flex gap-2">
+  <!-- Вкладка "Бот" -->
+  <button
+    data-messenger-target="tabBot"
+    data-action="click->messenger#switchTab"
+    data-tab="bot"
+    class="tab-button px-4 py-2 rounded-lg font-medium transition-colors <%= last_message_source == 'bot' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100' %>">
+    🤖 Бот (<%= @messages.from_bot.count %>)
+  </button>
+
+  <!-- Вкладка "Бизнес" -->
+  <button
+    data-messenger-target="tabBusiness"
+    data-action="click->messenger#switchTab"
+    data-tab="business"
+    class="tab-button px-4 py-2 rounded-lg font-medium transition-colors <%= last_message_source == 'business' ? 'bg-green-100 text-green-700' : 'text-gray-600 hover:bg-gray-100' %>">
+    👤 Бизнес (<%= @messages.from_business.count %>)
+  </button>
+</div>
+```
+
+**Цветовые схемы:**
+- **Бот (активная):** `bg-blue-100 text-blue-700` - Синий
+- **Бизнес (активная):** `bg-green-100 text-green-700` - Зеленый
+- **Неактивная:** `text-gray-600 hover:bg-gray-100` - Серый с hover эффектом
+
+**JavaScript реализация:**
+
+**1. Автодетекция активной вкладки при загрузке**
+```javascript
+// app/javascript/controllers/messenger_controller.js (lines 36-42)
+connect() {
+  // Определяем активную вкладку по последнему сообщению
+  const messages = this.element.querySelectorAll('.message-item')
+  const lastMessage = messages[messages.length - 1]
+  this.activeTab = lastMessage?.dataset.sourceType || 'bot'
+
+  this.subscribeToChannel()
+  this.scrollToBottom()
+}
+```
+
+**2. switchTab() - Обработчик переключения вкладок**
+```javascript
+// app/javascript/controllers/messenger_controller.js (lines 45-70)
+switchTab(event) {
+  const button = event.currentTarget
+  const tab = button.dataset.tab
+
+  // Обновляем активную вкладку
+  this.activeTab = tab
+
+  // Обновляем стили кнопок
+  const allButtons = this.element.querySelectorAll('.tab-button')
+  allButtons.forEach(btn => {
+    btn.classList.remove('bg-blue-100', 'text-blue-700', 'bg-green-100', 'text-green-700')
+    btn.classList.add('text-gray-600', 'hover:bg-gray-100')
+  })
+
+  // Подсвечиваем активную
+  if (tab === 'bot') {
+    button.classList.remove('text-gray-600', 'hover:bg-gray-100')
+    button.classList.add('bg-blue-100', 'text-blue-700')
+  } else if (tab === 'business') {
+    button.classList.remove('text-gray-600', 'hover:bg-gray-100')
+    button.classList.add('bg-green-100', 'text-green-700')
+  }
+
+  // Фильтруем сообщения
+  this.filterMessages()
+}
+```
+
+**3. filterMessages() - Фильтрация сообщений по типу**
+```javascript
+// app/javascript/controllers/messenger_controller.js (lines 72-86)
+filterMessages() {
+  const messages = this.messagesTarget.querySelectorAll('.message-item')
+
+  messages.forEach(msg => {
+    const sourceType = msg.dataset.sourceType
+
+    if (this.activeTab === sourceType) {
+      msg.style.display = 'flex'  // Показываем совпадающие
+    } else {
+      msg.style.display = 'none'  // Скрываем несовпадающие
+    }
+  })
+
+  this.scrollToBottom()
+}
+```
+
+**Интеграция с отправкой сообщений:**
+
+При отправке сообщения админом, `activeTab` передается в backend через `source_type` параметр:
+
+```javascript
+// app/javascript/controllers/messenger_controller.js (lines 506-532)
+async sendMessage(event) {
+  event.preventDefault()
+
+  const body = this.inputTarget.value.trim()
+  if (!body) return
+
+  try {
+    const response = await fetch(`/messenger/conversations/${this.activeConversationId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': document.querySelector('[name="csrf-token"]').content
+      },
+      body: JSON.stringify({
+        body: body,
+        source_type: this.activeTab  // ← Передаём выбранную вкладку
+      })
+    })
+
+    // ...
+  }
+}
+```
+
+**Backend обработка:**
+```ruby
+# app/controllers/messenger_controller.rb (lines 35-54)
+def send_message
+  body = params[:body]
+
+  # Используем source_type из параметров запроса (выбор пользователя через вкладки)
+  source_type = params[:source_type] || 'bot'
+
+  Rails.logger.info "Sending message via #{source_type} channel"
+
+  # Отправляем через выбранный канал
+  if source_type.to_s == 'business'
+    send_via_business_connection(body)
+  else
+    send_via_bot(body)
+  end
+end
+```
+
+**Real-time обновления при новых сообщениях:**
+
+Когда приходит новое сообщение через ActionCable, система автоматически добавляет его с корректным `data-source-type` атрибутом:
+
+```javascript
+// app/javascript/controllers/messenger_controller.js (lines 246-301)
+createMessageElement(message) {
+  const sourceType = message.source_type || 'bot';
+
+  // ... message rendering
+  return `
+    <div class="message-item flex" data-message-id="${message.id}" data-source-type="${sourceType}">
+      <!-- message content -->
+    </div>
+  `
+}
+```
+
+**Пользовательский опыт:**
+
+1. **При открытии беседы:**
+   - Автоматически активируется вкладка последнего сообщения
+   - Отображаются только сообщения этого типа
+
+2. **При переключении вкладок:**
+   - Мгновенная фильтрация через CSS `display: none`
+   - Цвет вкладки меняется (синий/зеленый)
+   - Счетчик показывает количество сообщений
+
+3. **При отправке сообщения:**
+   - Сообщение отправляется через канал активной вкладки
+   - Новое сообщение появляется в текущей вкладке
+   - Счетчик обновляется автоматически
+
+**Связь с Telegram Business API:**
+См. `telegram_business_api.md` для деталей о:
+- Dual-channel messaging (Bot + Business)
+- Business connection setup
+- Message routing logic
+
+---
+
 ### Conversation List
 
 **Layout:**

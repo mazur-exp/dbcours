@@ -124,7 +124,7 @@ add_index :messages, [:conversation_id, :source_type]
 ### Through Bot (Default)
 
 ```ruby
-# MessengerController#send_via_bot
+# MessengerController#send_via_bot (lines 94-148)
 bot_client.api.send_message(
   chat_id: user.telegram_id,
   text: body
@@ -136,23 +136,174 @@ bot_client.api.send_message(
 ### Through Business Connection
 
 ```ruby
-# MessengerController#send_via_business_connection
-bot_client.api.send_business_message(
+# MessengerController#send_via_business_connection (lines 152-232)
+bot_client.api.send_message(
   business_connection_id: connection.business_connection_id,
-  chat_id: connection.user_chat_id,
+  chat_id: user.telegram_id,
   text: body
 )
 
 # Saved with source_type: :business
 ```
 
-**Routing Logic:**
-- If `params[:source_type] == 'business'` → send via business
-- Otherwise → send via bot
+**Routing Logic (User-Selected Channel):**
+
+Раньше канал выбирался автоматически на основе последнего входящего сообщения. Теперь админ выбирает канал через UI вкладки.
+
+```ruby
+# app/controllers/messenger_controller.rb (lines 35-54)
+def send_message
+  # Используем source_type из параметров запроса (выбор пользователя через вкладки)
+  source_type = params[:source_type] || 'bot'
+
+  Rails.logger.info "Sending message via #{source_type} channel"
+
+  # Отправляем через выбранный канал
+  if source_type.to_s == 'business'
+    send_via_business_connection(body)
+  else
+    send_via_bot(body)
+  end
+end
+```
+
+**Frontend передает source_type:**
+```javascript
+// app/javascript/controllers/messenger_controller.js (lines 522-532)
+fetch(`/messenger/conversations/${conversationId}/messages`, {
+  method: 'POST',
+  body: JSON.stringify({
+    body: body,
+    source_type: this.activeTab  // Передаём выбранную вкладку (bot/business)
+  })
+})
+```
 
 ---
 
 ## UI Components
+
+### Tab-Based UI for Channel Selection
+
+**Status:** ✅ Implemented (October 13, 2025)
+
+**Описание:**
+Вместо автоматического роутинга админ теперь выбирает канал отправки через вкладки. Система показывает две вкладки с количеством сообщений по каждому каналу и фильтрует отображаемые сообщения при переключении.
+
+**Расположение:** `app/views/messenger/index.html.erb` (lines 70-87)
+
+**Структура вкладок:**
+```erb
+<!-- Вкладки для фильтрации по источнику -->
+<div class="bg-white border-b border-gray-200 px-4 py-2 flex gap-2">
+  <button
+    data-messenger-target="tabBot"
+    data-action="click->messenger#switchTab"
+    data-tab="bot"
+    class="tab-button px-4 py-2 rounded-lg font-medium transition-colors">
+    🤖 Бот (<%= @messages.from_bot.count %>)
+  </button>
+  <button
+    data-messenger-target="tabBusiness"
+    data-action="click->messenger#switchTab"
+    data-tab="business"
+    class="tab-button px-4 py-2 rounded-lg font-medium transition-colors">
+    👤 Бизнес (<%= @messages.from_business.count %>)
+  </button>
+</div>
+```
+
+**Визуальные стили:**
+- **Активная вкладка "Бот":** `bg-blue-100 text-blue-700`
+- **Активная вкладка "Бизнес":** `bg-green-100 text-green-700`
+- **Неактивная:** `text-gray-600 hover:bg-gray-100`
+
+**JavaScript функции:**
+
+**1. switchTab() - Переключение вкладок**
+```javascript
+// app/javascript/controllers/messenger_controller.js (lines 45-70)
+switchTab(event) {
+  const button = event.currentTarget
+  const tab = button.dataset.tab
+
+  // Обновляем активную вкладку
+  this.activeTab = tab
+
+  // Обновляем стили кнопок
+  const allButtons = this.element.querySelectorAll('.tab-button')
+  allButtons.forEach(btn => {
+    btn.classList.remove('bg-blue-100', 'text-blue-700', 'bg-green-100', 'text-green-700')
+    btn.classList.add('text-gray-600', 'hover:bg-gray-100')
+  })
+
+  // Подсвечиваем активную
+  if (tab === 'bot') {
+    button.classList.remove('text-gray-600', 'hover:bg-gray-100')
+    button.classList.add('bg-blue-100', 'text-blue-700')
+  } else if (tab === 'business') {
+    button.classList.remove('text-gray-600', 'hover:bg-gray-100')
+    button.classList.add('bg-green-100', 'text-green-700')
+  }
+
+  // Фильтруем сообщения
+  this.filterMessages()
+}
+```
+
+**2. filterMessages() - Фильтрация сообщений**
+```javascript
+// app/javascript/controllers/messenger_controller.js (lines 72-86)
+filterMessages() {
+  const messages = this.messagesTarget.querySelectorAll('.message-item')
+
+  messages.forEach(msg => {
+    const sourceType = msg.dataset.sourceType
+
+    if (this.activeTab === sourceType) {
+      msg.style.display = 'flex'  // Показываем совпадающие
+    } else {
+      msg.style.display = 'none'  // Скрываем несовпадающие
+    }
+  })
+
+  this.scrollToBottom()
+}
+```
+
+**3. Автоматическое определение активной вкладки**
+```javascript
+// app/javascript/controllers/messenger_controller.js (lines 36-39)
+connect() {
+  // Определяем активную вкладку по последнему сообщению
+  const messages = this.element.querySelectorAll('.message-item')
+  const lastMessage = messages[messages.length - 1]
+  this.activeTab = lastMessage?.dataset.sourceType || 'bot'
+}
+```
+
+**Атрибут data-source-type в сообщениях:**
+```erb
+<!-- app/views/messenger/_messages.html.erb (line 2) -->
+<div class="message-item flex" data-message-id="<%= message.id %>" data-source-type="<%= message.source_type %>">
+  <!-- message content -->
+</div>
+```
+
+**Логика работы:**
+1. При загрузке страницы автоматически активируется вкладка последнего сообщения
+2. Клик по вкладке переключает `activeTab` в Stimulus контроллере
+3. `filterMessages()` скрывает сообщения несовпадающего типа через `display: none`
+4. При отправке сообщения передается `source_type: this.activeTab` в бэкенд
+5. Новые сообщения отображаются только на соответствующей вкладке
+
+**Преимущества:**
+- Ясный контроль админа над каналом отправки
+- Визуальное разделение потоков сообщений (Bot vs Business)
+- Счетчики помогают видеть объем общения по каждому каналу
+- Фильтрация работает мгновенно через JavaScript
+
+---
 
 ### Message Source Indicators
 
@@ -266,13 +417,6 @@ enum :source_type, { bot: 0, business: 1 }
 ---
 
 ## Future Enhancements
-
-### Tab-Based UI
-
-Replace icon indicators with proper tabs:
-- "🤖 Бот" tab - Shows only bot messages
-- "👤 Бизнес" tab - Shows only business messages
-- Stimulus controller for tab switching
 
 ### Business Connection Management
 

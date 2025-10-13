@@ -90,7 +90,7 @@ class AuthController < ApplicationController
 
     # Обработка Business Messages
     if update["business_message"]
-      handle_business_message(update["business_message"], update["business_connection_id"])
+      handle_business_message(update["business_message"], update["business_message"]["business_connection_id"])
     end
 
     # Обработка команды /start
@@ -510,7 +510,8 @@ class AuthController < ApplicationController
     text = message["text"]
     message_id = message["message_id"]
 
-    Rails.logger.info "Business message from #{from['id']}: #{text}"
+    Rails.logger.info "📨 Business message from #{from['id']}: #{text}"
+    Rails.logger.info "📨 Business connection ID: #{business_connection_id}"
 
     # Находим или создаём пользователя
     user = User.find_or_initialize_by(telegram_id: from["id"])

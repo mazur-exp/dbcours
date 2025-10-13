@@ -67,6 +67,25 @@
           </div>
         </div>
 
+        <!-- Вкладки для фильтрации по источнику -->
+        <% last_message_source = @messages.last&.source_type || 'bot' %>
+        <div class="bg-white border-b border-gray-200 px-4 py-2 flex gap-2">
+          <button
+            data-messenger-target="tabBot"
+            data-action="click->messenger#switchTab"
+            data-tab="bot"
+            class="tab-button px-4 py-2 rounded-lg font-medium transition-colors <%= last_message_source == 'bot' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100' %>">
+            🤖 Бот (<%= @messages.from_bot.count %>)
+          </button>
+          <button
+            data-messenger-target="tabBusiness"
+            data-action="click->messenger#switchTab"
+            data-tab="business"
+            class="tab-button px-4 py-2 rounded-lg font-medium transition-colors <%= last_message_source == 'business' ? 'bg-green-100 text-green-700' : 'text-gray-600 hover:bg-gray-100' %>">
+            👤 Бизнес (<%= @messages.from_business.count %>)
+          </button>
+        </div>
+
         <!-- Сообщения -->
         <div class="flex-1 overflow-y-auto p-4 space-y-4" id="messages-container" data-messenger-target="messages">
           <%= render partial: 'messages', locals: { messages: @messages } %>
