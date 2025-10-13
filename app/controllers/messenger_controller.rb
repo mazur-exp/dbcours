@@ -43,12 +43,12 @@ class MessengerController < ApplicationController
 
     # Автоматически определяем source через какой канал пришло последнее сообщение от клиента
     last_incoming = @conversation.messages.incoming.order(created_at: :desc).first
-    source_type = last_incoming&.source_type || 'bot'
+    source_type = last_incoming&.source_type || :bot  # Symbol, не String!
 
     Rails.logger.info "Auto-detected source_type: #{source_type} (last incoming message: #{last_incoming&.id})"
 
     # Отправляем через тот же канал что и получили
-    if source_type == 'business'
+    if source_type.to_sym == :business
       send_via_business_connection(body)
     else
       send_via_bot(body)
