@@ -1,0 +1,72 @@
+<div class="min-h-screen bg-gray-100">
+  <nav class="bg-white shadow-sm border-b">
+    <div class="max-w-7xl mx-auto px-4 py-4">
+      <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold">Business Connections</h1>
+        <%= link_to "← Назад к Messenger", messenger_path, class: "text-blue-600 hover:text-blue-800" %>
+      </div>
+    </div>
+  </nav>
+
+  <div class="max-w-7xl mx-auto px-4 py-8">
+    <!-- Active Connections -->
+    <div class="bg-white rounded-lg shadow-sm mb-6">
+      <div class="px-6 py-4 border-b">
+        <h2 class="text-lg font-semibold text-green-700">✅ Активные подключения (<%= @active_connections.count %>)</h2>
+      </div>
+      <div class="divide-y">
+        <% if @active_connections.any? %>
+          <% @active_connections.each do |conn| %>
+            <div class="px-6 py-4 hover:bg-gray-50">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="font-semibold"><%= conn.user.full_name %></p>
+                  <p class="text-sm text-gray-600">@<%= conn.user.username %></p>
+                  <p class="text-xs text-gray-500 mt-1">Connection ID: <code class="bg-gray-100 px-2 py-0.5 rounded"><%= conn.business_connection_id %></code></p>
+                </div>
+                <div class="text-right">
+                  <p class="text-xs text-gray-500">Подключено</p>
+                  <p class="text-sm"><%= conn.connected_at.strftime("%d.%m.%Y %H:%M") %></p>
+                  <% if conn.can_reply %>
+                    <span class="inline-block mt-2 px-2 py-1 text-xs bg-green-100 text-green-800 rounded">Может отвечать</span>
+                  <% else %>
+                    <span class="inline-block mt-2 px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">Только чтение</span>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        <% else %>
+          <div class="px-6 py-8 text-center text-gray-500">
+            Нет активных business connections
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <!-- Disconnected Connections -->
+    <% if @disconnected_connections.any? %>
+      <div class="bg-white rounded-lg shadow-sm">
+        <div class="px-6 py-4 border-b">
+          <h2 class="text-lg font-semibold text-gray-700">❌ Отключенные (<%= @disconnected_connections.count %>)</h2>
+        </div>
+        <div class="divide-y">
+          <% @disconnected_connections.each do |conn| %>
+            <div class="px-6 py-4 bg-gray-50">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="font-semibold text-gray-600"><%= conn.user.full_name %></p>
+                  <p class="text-sm text-gray-500">@<%= conn.user.username %></p>
+                </div>
+                <div class="text-right">
+                  <p class="text-xs text-gray-500">Отключено</p>
+                  <p class="text-sm text-gray-600"><%= conn.disconnected_at&.strftime("%d.%m.%Y %H:%M") %></p>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>

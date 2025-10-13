@@ -10,7 +10,23 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_10_09_163441) do
+ActiveRecord::Schema[8.0].define(version: 2025_10_13_073842) do
+  create_table "business_connections", force: :cascade do |t|
+    t.string "business_connection_id", null: false
+    t.integer "user_id", null: false
+    t.bigint "user_chat_id", null: false
+    t.boolean "can_reply", default: false, null: false
+    t.boolean "is_enabled", default: true, null: false
+    t.datetime "connected_at", null: false
+    t.datetime "disconnected_at"
+    t.integer "status", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["business_connection_id"], name: "index_business_connections_on_business_connection_id", unique: true
+    t.index ["user_id", "status"], name: "index_business_connections_on_user_id_and_status"
+    t.index ["user_id"], name: "index_business_connections_on_user_id"
+  end
+
   create_table "conversations", force: :cascade do |t|
     t.integer "user_id", null: false
     t.datetime "last_message_at"
@@ -35,7 +51,11 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_09_163441) do
     t.boolean "read", default: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "source_type", default: 0, null: false
+    t.string "business_connection_id"
+    t.index ["business_connection_id"], name: "index_messages_on_business_connection_id"
     t.index ["conversation_id", "created_at"], name: "index_messages_on_conversation_id_and_created_at"
+    t.index ["conversation_id", "source_type"], name: "index_messages_on_conversation_id_and_source_type"
     t.index ["conversation_id"], name: "index_messages_on_conversation_id"
     t.index ["telegram_message_id"], name: "index_messages_on_telegram_message_id"
     t.index ["user_id"], name: "index_messages_on_user_id"
@@ -56,6 +76,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_09_163441) do
     t.index ["telegram_id"], name: "index_users_on_telegram_id", unique: true
   end
 
+  add_foreign_key "business_connections", "users"
   add_foreign_key "conversations", "users"
   add_foreign_key "messages", "conversations"
   add_foreign_key "messages", "users"

@@ -22,6 +22,9 @@ Rails.application.routes.draw do
   patch "messenger/conversations/:id/mark_read", to: "messenger#mark_read", as: :messenger_mark_read
   delete "messenger/users/:id", to: "messenger#delete_user", as: :messenger_delete_user
 
+  # Business Connections (Admin only)
+  get "messenger/business_connections", to: "business_connections#index", as: :messenger_business_connections
+
   # Free content routes
   get "freecontent", to: "free_lessons#index", as: :freecontent
   get "freecontent/:id", to: "free_lessons#show", as: :freecontent_lesson

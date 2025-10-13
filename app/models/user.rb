@@ -1,6 +1,7 @@
 class User < ApplicationRecord
   has_many :conversations, dependent: :destroy
   has_many :messages
+  has_many :business_connections, dependent: :destroy
 
   # Scopes
   scope :admins, -> { where(admin: true) }

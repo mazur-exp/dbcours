@@ -1,17 +1,24 @@
 class Message < ApplicationRecord
   belongs_to :conversation
   belongs_to :user, optional: true # nullable для админских сообщений
+  belongs_to :business_connection, optional: true
 
   # Enum для направления сообщения
   enum :direction, { incoming: 0, outgoing: 1 }
 
+  # Enum для источника сообщения
+  enum :source_type, { bot: 0, business: 1 }
+
   # Validations
   validates :body, presence: true
   validates :direction, presence: true
+  validates :source_type, presence: true
 
   # Scopes
   scope :unread, -> { where(read: false) }
   scope :by_time, -> { order(created_at: :asc) }
+  scope :from_bot, -> { where(source_type: :bot) }
+  scope :from_business, -> { where(source_type: :business) }
 
   # Callbacks
   after_create :update_conversation_timestamp

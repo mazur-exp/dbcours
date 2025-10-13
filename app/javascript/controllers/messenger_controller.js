@@ -198,8 +198,11 @@ export default class extends Controller {
     const userLetter = userName[0].toUpperCase()
     const avatarUrl = message.user?.avatar_url
 
+    const sourceBadge = message.source_type === 'business'
+      ? '<span class="text-xs text-green-600" title="Через бизнес-аккаунт">👤</span>'
+      : '<span class="text-xs text-blue-600" title="Через бота">🤖</span>';
+
     if (isIncoming) {
-      // Создаём HTML для аватарки (либо изображение, либо инициалы)
       const avatarHtml = avatarUrl
         ? `<img src="${avatarUrl}" class="w-8 h-8 rounded-full object-cover flex-shrink-0" alt="${userName}" loading="lazy">`
         : `<div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0">${userLetter}</div>`
@@ -213,21 +216,28 @@ export default class extends Controller {
                 <div class="bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
                   <p class="text-gray-900 whitespace-pre-wrap break-words">${this.escapeHtml(message.body)}</p>
                 </div>
-                <p class="text-xs text-gray-500 mt-1 ml-2">${time}</p>
+                <div class="flex items-center gap-2 mt-1 ml-2">
+                  <p class="text-xs text-gray-500">${time}</p>
+                  ${sourceBadge}
+                </div>
               </div>
             </div>
           </div>
         </div>
       `
     } else {
+      const bgColor = message.source_type === 'business' ? 'bg-green-500' : 'bg-blue-500';
       return `
         <div class="flex justify-end" data-message-id="${message.id}">
           <div class="max-w-xl">
             <div class="flex flex-col items-end">
-              <div class="bg-blue-500 text-white rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm">
+              <div class="${bgColor} text-white rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm">
                 <p class="whitespace-pre-wrap break-words">${this.escapeHtml(message.body)}</p>
               </div>
-              <p class="text-xs text-gray-500 mt-1 mr-2">${time}</p>
+              <div class="flex items-center gap-2 mt-1 mr-2">
+                ${sourceBadge}
+                <p class="text-xs text-gray-500">${time}</p>
+              </div>
             </div>
           </div>
         </div>

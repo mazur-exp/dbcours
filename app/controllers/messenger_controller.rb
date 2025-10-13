@@ -35,13 +35,25 @@ class MessengerController < ApplicationController
   # POST /messenger/conversations/:id/messages
   def send_message
     body = params[:body]
+    source_type = params[:source_type] || 'bot'  # 'bot' или 'business'
 
     if body.blank?
       render json: { error: 'Message cannot be blank' }, status: :unprocessable_entity
       return
     end
 
-    # Отправляем сообщение через Telegram API
+    # Определяем через какой канал отправлять
+    if source_type == 'business'
+      send_via_business_connection(body)
+    else
+      send_via_bot(body)
+    end
+  end
+
+  private
+
+  def send_via_bot(body)
+    # Отправляем сообщение через Telegram Bot API
     begin
       result = bot_client.api.send_message(
         chat_id: @conversation.user.telegram_id,
@@ -55,33 +67,32 @@ class MessengerController < ApplicationController
       message = @conversation.messages.create!(
         body: body,
         direction: :outgoing,
-        telegram_message_id: result.message_id, # используем атрибут объекта, а не хэш
+        telegram_message_id: result.message_id,
+        source_type: :bot,  # отправлено через бота
         read: true,
         user_id: nil # от админа
       )
 
-      # Reload conversation для получения актуального last_message_at
+      # Reload conversation
       @conversation.reload
 
-      # Broadcast через ActionCable
+      # Broadcast
       ActionCable.server.broadcast("messenger_channel", {
         type: 'new_message',
         conversation_id: @conversation.id,
-        message: message.as_json(include: :user),
+        message: message.as_json(include: :user).merge(source_type: 'bot'),
         conversation: {
           id: @conversation.id,
           user: @conversation.user.as_json(only: [:id, :first_name, :last_name, :username, :avatar_url]),
-          last_message: message.as_json(only: [:id, :body, :direction, :created_at]),
+          last_message: message.as_json(only: [:id, :body, :direction, :created_at, :source_type]),
           unread_count: @conversation.unread_count,
           last_message_at: @conversation.last_message_at,
-          # AI Qualification данные для real-time обновления sidebar
           ai_qualification: {
             real_name: @conversation.ai_real_name,
             background: @conversation.ai_background,
             query: @conversation.ai_query,
             ready_score: @conversation.ai_ready_score
           },
-          # Статистика сообщений
           statistics: {
             total_messages: @conversation.messages.count,
             incoming_count: @conversation.messages.incoming.count,
@@ -92,7 +103,7 @@ class MessengerController < ApplicationController
 
       render json: { success: true, message: message.as_json }
     rescue => e
-      Rails.logger.error "Failed to send message: #{e.message}"
+      Rails.logger.error "Failed to send bot message: #{e.message}"
       render json: { error: 'Failed to send message' }, status: :unprocessable_entity
     end
   end
@@ -132,7 +143,69 @@ class MessengerController < ApplicationController
     redirect_to messenger_path, notice: "Пользователь #{username} и вся связанная информация успешно удалены"
   end
 
-  private
+  def send_via_business_connection(body)
+    # Находим активный business connection для пользователя
+    business_conn = @conversation.user.business_connections.active_connections.first
+
+    unless business_conn&.can_send_messages?
+      render json: { error: 'No active business connection or cannot reply' }, status: :unprocessable_entity
+      return
+    end
+
+    begin
+      # Отправляем через Business Connection API
+      result = bot_client.api.send_business_message(
+        business_connection_id: business_conn.business_connection_id,
+        chat_id: business_conn.user_chat_id,
+        text: body
+      )
+
+      Rails.logger.info "Business message sent: #{result.inspect}"
+
+      # Сохраняем в БД как business message
+      message = @conversation.messages.create!(
+        body: body,
+        direction: :outgoing,
+        telegram_message_id: result.message_id,
+        source_type: :business,  # отправлено через business
+        business_connection_id: business_conn.business_connection_id,
+        read: true,
+        user_id: nil # от админа через business
+      )
+
+      # Reload и broadcast
+      @conversation.reload
+
+      ActionCable.server.broadcast("messenger_channel", {
+        type: 'new_message',
+        conversation_id: @conversation.id,
+        message: message.as_json(include: :user).merge(source_type: 'business'),
+        conversation: {
+          id: @conversation.id,
+          user: @conversation.user.as_json(only: [:id, :first_name, :last_name, :username, :avatar_url]),
+          last_message: message.as_json(only: [:id, :body, :direction, :created_at, :source_type]),
+          unread_count: @conversation.unread_count,
+          last_message_at: @conversation.last_message_at,
+          ai_qualification: {
+            real_name: @conversation.ai_real_name,
+            background: @conversation.ai_background,
+            query: @conversation.ai_query,
+            ready_score: @conversation.ai_ready_score
+          },
+          statistics: {
+            total_messages: @conversation.messages.count,
+            incoming_count: @conversation.messages.incoming.count,
+            outgoing_count: @conversation.messages.outgoing.count
+          }
+        }
+      })
+
+      render json: { success: true, message: message.as_json }
+    rescue => e
+      Rails.logger.error "Failed to send business message: #{e.message}"
+      render json: { error: 'Failed to send business message' }, status: :unprocessable_entity
+    end
+  end
 
   def require_admin
     unless @current_user&.admin?

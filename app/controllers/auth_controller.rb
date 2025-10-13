@@ -81,7 +81,17 @@ class AuthController < ApplicationController
   def webhook
     update = JSON.parse(request.body.read)
 
-    Rails.logger.info "Telegram webhook received: #{update.inspect}"
+    Rails.logger.info "Telegram webhook received: #{update.keys.join(', ')}"
+
+    # Обработка Business Connection updates
+    if update["business_connection"]
+      handle_business_connection(update["business_connection"])
+    end
+
+    # Обработка Business Messages
+    if update["business_message"]
+      handle_business_message(update["business_message"], update["business_connection_id"])
+    end
 
     # Обработка команды /start
     if update["message"] && update["message"]["text"]&.start_with?("/start")
@@ -454,6 +464,116 @@ class AuthController < ApplicationController
     rescue => e
       Rails.logger.error "Failed to send typing action: #{e.message}"
     end
+  end
+
+  def handle_business_connection(connection_data)
+    business_connection_id = connection_data["id"]
+    user_data = connection_data["user"]
+    user_chat_id = connection_data["user_chat_id"]
+    can_reply = connection_data["can_reply"]
+    is_enabled = connection_data["is_enabled"]
+    date = connection_data["date"]
+
+    Rails.logger.info "Business connection update: #{business_connection_id}, user: #{user_data['id']}, can_reply: #{can_reply}"
+
+    # Находим или создаём пользователя
+    user = User.find_or_initialize_by(telegram_id: user_data["id"])
+    user.assign_attributes(
+      username: user_data["username"],
+      first_name: user_data["first_name"],
+      last_name: user_data["last_name"]
+    )
+    user.save!
+
+    # Находим или создаём business connection
+    business_conn = BusinessConnection.find_or_initialize_by(
+      business_connection_id: business_connection_id
+    )
+
+    business_conn.assign_attributes(
+      user: user,
+      user_chat_id: user_chat_id,
+      can_reply: can_reply,
+      is_enabled: is_enabled,
+      connected_at: Time.at(date),
+      status: is_enabled ? :active : :disconnected,
+      disconnected_at: is_enabled ? nil : Time.current
+    )
+
+    business_conn.save!
+
+    Rails.logger.info "Business connection #{is_enabled ? 'established' : 'disconnected'} for user #{user.id}"
+  end
+
+  def handle_business_message(message, business_connection_id)
+    from = message["from"]
+    text = message["text"]
+    message_id = message["message_id"]
+
+    Rails.logger.info "Business message from #{from['id']}: #{text}"
+
+    # Находим или создаём пользователя
+    user = User.find_or_initialize_by(telegram_id: from["id"])
+    user.assign_attributes(
+      username: from["username"],
+      first_name: from["first_name"],
+      last_name: from["last_name"]
+    )
+    user.save!
+
+    # Находим или создаём беседу
+    conversation = user.conversation
+
+    # Сохраняем сообщение с source_type: business
+    msg = conversation.messages.create!(
+      user: user,
+      body: text,
+      direction: :incoming,
+      telegram_message_id: message_id,
+      source_type: :business,  # ← КЛЮЧЕВОЕ ОТЛИЧИЕ от обычных сообщений
+      business_connection_id: business_connection_id,
+      read: false
+    )
+
+    Rails.logger.info "Business message created: #{msg.id}, source: business"
+
+    conversation.reload
+
+    # Устанавливаем флаг AI обработки (typing indicator)
+    conversation.update!(ai_processing: true)
+    send_typing_action(user.telegram_id)
+    TypingIndicatorJob.set(wait: 4.seconds).perform_later(conversation.id)
+
+    # Отправляем в N8N (как обычно)
+    send_message_to_n8n(msg, user, conversation)
+
+    # Broadcast в messenger с указанием source_type
+    ActionCable.server.broadcast("messenger_channel", {
+      type: "new_message",
+      conversation_id: conversation.id,
+      message: msg.as_json(include: :user).merge(source_type: 'business'),  # добавляем source_type
+      conversation: {
+        id: conversation.id,
+        user: conversation.user.as_json(only: [:id, :first_name, :last_name, :username, :avatar_url]),
+        last_message: msg.as_json(only: [:id, :body, :direction, :created_at, :source_type]),
+        unread_count: conversation.unread_count,
+        last_message_at: conversation.last_message_at,
+        ai_qualification: {
+          real_name: conversation.ai_real_name,
+          background: conversation.ai_background,
+          query: conversation.ai_query,
+          ready_score: conversation.ai_ready_score
+        },
+        statistics: {
+          total_messages: conversation.messages.count,
+          incoming_count: conversation.messages.incoming.count,
+          outgoing_count: conversation.messages.outgoing.count
+        }
+      }
+    })
+  rescue => e
+    Rails.logger.error "Error in handle_business_message: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
   end
 
   def bot_client

@@ -12,6 +12,14 @@
           <% end %>
         </div>
         <div class="flex items-center gap-4">
+          <% if @current_user&.admin? %>
+            <%= link_to messenger_business_connections_path, class: "text-gray-600 hover:text-gray-900 flex items-center gap-1" do %>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+              </svg>
+              Business Connections
+            <% end %>
+          <% end %>
           <%= link_to "Главная", root_path, class: "text-gray-600 hover:text-gray-900" %>
           <%= render partial: "shared/auth_button" %>
         </div>
