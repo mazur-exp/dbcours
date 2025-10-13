@@ -27,13 +27,15 @@
     </div>
   </nav>
 
-  <!-- 3-панельная структура -->
+  <!-- 3-панельная структура с адаптивностью -->
   <div class="flex-1 flex overflow-hidden">
     <!-- Левая панель: список чатов -->
-    <aside class="w-80 bg-white border-r border-gray-200 flex flex-col">
-      <div class="p-4 border-b border-gray-200 flex-shrink-0">
-        <h2 class="text-lg font-bold text-gray-900">Чаты</h2>
-        <p class="text-sm text-gray-500"><%= @conversations.size %> беседа(ы)</p>
+    <!-- На мобильном: показываем только если нет активного чата -->
+    <!-- На планшетах и десктопе: всегда показываем -->
+    <aside class="<%= @active_conversation ? 'hidden md:flex' : 'flex' %> w-full md:w-80 lg:w-96 bg-white border-r border-gray-200 flex-col" data-messenger-target="conversationsSidebar">
+      <div class="p-4 md:p-4 border-b border-gray-200 flex-shrink-0">
+        <h2 class="text-xl md:text-lg font-bold text-gray-900">Чаты</h2>
+        <p class="text-base md:text-sm text-gray-500"><%= @conversations.size %> беседа(ы)</p>
       </div>
 
       <div class="flex-1 overflow-y-auto" id="conversations-list" data-messenger-target="conversationsList">
@@ -54,34 +56,63 @@
     </aside>
 
     <!-- Средняя панель: переписка -->
-    <main class="flex-1 flex flex-col bg-gray-50" data-conversation-id="<%= @active_conversation&.id %>">
+    <!-- На мобильном: показываем только если есть активный чат -->
+    <!-- На планшетах и десктопе: всегда показываем -->
+    <main class="<%= @active_conversation ? 'flex' : 'hidden md:flex' %> flex-1 flex-col bg-gray-50" data-conversation-id="<%= @active_conversation&.id %>">
       <% if @active_conversation %>
-        <!-- Заголовок чата -->
-        <div class="bg-white border-b border-gray-200 p-4 flex items-center gap-3 flex-shrink-0">
-          <%= user_avatar(@active_user) %>
-          <div>
-            <h3 class="font-bold text-gray-900"><%= @active_user.full_name %></h3>
+        <!-- Заголовок чата с кнопкой "Назад" для мобильных -->
+        <div class="bg-white border-b border-gray-200 p-3 md:p-4 flex items-center gap-3 flex-shrink-0">
+          <!-- Кнопка "Назад" для мобильных -->
+          <button
+            data-action="click->messenger#goBackToList"
+            class="md:hidden flex items-center justify-center w-10 h-10 -ml-2 rounded-full hover:bg-gray-100 transition-colors"
+            aria-label="Вернуться к списку чатов">
+            <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+            </svg>
+          </button>
+
+          <!-- Аватарка с кликом для открытия профиля (только на мобильных) -->
+          <div
+            data-action="click->messenger#toggleProfile"
+            class="cursor-pointer lg:cursor-default">
+            <%= user_avatar(@active_user) %>
+          </div>
+
+          <div class="flex-1 min-w-0">
+            <h3 class="font-bold text-gray-900 truncate"><%= @active_user.full_name %></h3>
             <% if @active_user.username.present? %>
-              <p class="text-sm text-gray-500">@<%= @active_user.username %></p>
+              <p class="text-sm text-gray-500 truncate">@<%= @active_user.username %></p>
             <% end %>
           </div>
+
+          <!-- Кнопка меню для показа профиля на планшетах -->
+          <button
+            data-action="click->messenger#toggleProfile"
+            data-messenger-target="profileToggle"
+            class="lg:hidden flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 transition-colors"
+            aria-label="Показать профиль">
+            <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </button>
         </div>
 
         <!-- Вкладки для фильтрации по источнику -->
         <% last_message_source = @messages.last&.source_type || 'bot' %>
-        <div class="bg-white border-b border-gray-200 px-4 py-2 flex gap-2 items-center">
+        <div class="bg-white border-b border-gray-200 px-2 md:px-4 py-2 flex gap-1 md:gap-2 items-center overflow-x-auto">
           <button
             data-messenger-target="tabBot"
             data-action="click->messenger#switchTab"
             data-tab="bot"
-            class="tab-button px-4 py-2 rounded-lg font-medium transition-colors <%= last_message_source == 'bot' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100' %>">
+            class="tab-button px-3 md:px-4 py-2 md:py-2 rounded-lg text-sm md:text-base font-medium transition-colors whitespace-nowrap <%= last_message_source == 'bot' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100' %>">
             🤖 Бот (<%= @messages.from_bot.count %>)
           </button>
           <button
             data-messenger-target="tabBusiness"
             data-action="click->messenger#switchTab"
             data-tab="business"
-            class="tab-button px-4 py-2 rounded-lg font-medium transition-colors <%= last_message_source == 'business' ? 'bg-green-100 text-green-700' : 'text-gray-600 hover:bg-gray-100' %>">
+            class="tab-button px-3 md:px-4 py-2 md:py-2 rounded-lg text-sm md:text-base font-medium transition-colors whitespace-nowrap <%= last_message_source == 'business' ? 'bg-green-100 text-green-700' : 'text-gray-600 hover:bg-gray-100' %>">
             👤 Бизнес (<%= @messages.from_business.count %>)
           </button>
 
@@ -90,18 +121,20 @@
             data-messenger-target="aiPauseButton"
             data-action="click->messenger#toggleAiPause"
             data-ai-paused="<%= @active_conversation.ai_paused %>"
-            class="ml-auto px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 <%= @active_conversation.ai_paused ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' %>">
+            class="ml-auto px-3 md:px-4 py-2 md:py-2 rounded-lg text-sm md:text-base font-medium transition-colors flex items-center gap-1 md:gap-2 whitespace-nowrap <%= @active_conversation.ai_paused ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' %>">
             <% if @active_conversation.ai_paused %>
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
               </svg>
-              Включить AI
+              <span class="hidden sm:inline">Включить AI</span>
+              <span class="sm:hidden">AI</span>
             <% else %>
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
               </svg>
-              Пауза AI
+              <span class="hidden sm:inline">Пауза AI</span>
+              <span class="sm:hidden">⏸</span>
             <% end %>
           </button>
         </div>
@@ -112,24 +145,25 @@
         </div>
 
         <!-- Input для отправки сообщения -->
-        <div class="bg-white border-t border-gray-200 p-4 flex-shrink-0">
-          <form data-action="submit->messenger#sendMessage" class="flex gap-3">
+        <div class="bg-white border-t border-gray-200 p-3 md:p-4 flex-shrink-0">
+          <form data-action="submit->messenger#sendMessage" class="flex gap-2 md:gap-3">
             <textarea
               data-messenger-target="input"
               data-action="keydown->messenger#handleKeydown"
               rows="1"
               placeholder="Написать сообщение..."
-              class="flex-1 resize-none rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              style="max-height: 120px;"
+              class="flex-1 resize-none rounded-lg border border-gray-300 px-3 md:px-4 py-3 md:py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              style="max-height: 120px; min-height: 44px;"
             ></textarea>
             <button
               type="submit"
-              class="bg-blue-500 hover:bg-blue-600 text-white font-bold px-6 py-3 rounded-lg transition-colors flex items-center gap-2"
+              class="bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white font-bold px-4 md:px-6 py-3 rounded-lg transition-colors flex items-center justify-center gap-2 min-w-[44px] md:min-w-auto"
+              aria-label="Отправить сообщение"
             >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-5 h-5 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
               </svg>
-              Отправить
+              <span class="hidden md:inline">Отправить</span>
             </button>
           </form>
         </div>
@@ -148,8 +182,36 @@
     </main>
 
     <!-- Правая панель: профиль пользователя -->
+    <!-- На десктопе: всегда показываем -->
+    <!-- На планшетах и мобильных: показываем как overlay/modal -->
     <% if @active_user %>
-      <aside class="w-80 bg-white border-l border-gray-200 overflow-y-auto">
+      <!-- Overlay для мобильных/планшетов -->
+      <div
+        data-messenger-target="profileOverlay"
+        data-action="click->messenger#closeProfile"
+        class="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40 hidden"
+        aria-hidden="true">
+      </div>
+
+      <!-- Sidebar профиля -->
+      <!-- На мобильных: на весь экран (w-full) -->
+      <!-- На десктопе: боковая панель (w-80) -->
+      <aside
+        data-messenger-target="profileSidebar"
+        class="hidden lg:flex w-full lg:w-80 xl:w-96 bg-white border-l border-gray-200 overflow-y-auto flex-col lg:relative lg:z-auto fixed left-0 right-0 top-0 bottom-0 z-50 lg:translate-x-0 transform transition-transform duration-300 ease-in-out">
+        <!-- Кнопка закрытия для мобильных/планшетов -->
+        <div class="lg:hidden flex items-center justify-between p-4 border-b border-gray-200">
+          <h3 class="text-lg font-bold text-gray-900">Профиль</h3>
+          <button
+            data-action="click->messenger#closeProfile"
+            class="flex items-center justify-center w-10 h-10 rounded-full hover:bg-gray-100 transition-colors"
+            aria-label="Закрыть профиль">
+            <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+
         <div class="p-6">
           <!-- Аватар и имя -->
           <div class="text-center mb-6">

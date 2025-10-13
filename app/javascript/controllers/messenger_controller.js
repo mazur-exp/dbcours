@@ -6,12 +6,17 @@ export default class extends Controller {
     "messages",
     "input",
     "conversationsList",
+    "conversationsSidebar",
     // Tab targets
     "tabBot",
     "tabBotOnly",
     "tabBusiness",
     // AI Control
     "aiPauseButton",
+    // Profile sidebar targets
+    "profileSidebar",
+    "profileOverlay",
+    "profileToggle",
     // AI Qualification targets
     "aiQualificationSection",
     "aiQualificationContent",
@@ -96,15 +101,28 @@ export default class extends Controller {
   subscribeToChannel() {
     this.subscription = consumer.subscriptions.create("MessengerChannel", {
       connected: () => {
-        console.log("Connected to MessengerChannel")
+        console.log("✅ Connected to MessengerChannel")
+        this.showConnectionStatus('connected')
+
+        // Сбрасываем счетчик попыток переподключения
+        this.reconnectAttempts = 0
       },
 
       disconnected: () => {
-        console.log("Disconnected from MessengerChannel")
+        console.log("❌ Disconnected from MessengerChannel")
+        this.showConnectionStatus('disconnected')
+
+        // Пытаемся переподключиться автоматически
+        this.attemptReconnect()
+      },
+
+      rejected: () => {
+        console.log("🚫 Connection rejected by MessengerChannel")
+        this.showConnectionStatus('rejected')
       },
 
       received: (data) => {
-        console.log("Received from MessengerChannel:", data)
+        console.log("📨 Received from MessengerChannel:", data)
 
         if (data.type === "new_message") {
           this.handleNewMessage(data)
@@ -113,6 +131,48 @@ export default class extends Controller {
         }
       }
     })
+  }
+
+  // Автоматическое переподключение при потере связи
+  attemptReconnect() {
+    if (!this.reconnectAttempts) {
+      this.reconnectAttempts = 0
+    }
+
+    this.reconnectAttempts++
+    const maxAttempts = 10
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000) // Экспоненциальная задержка, макс 30 сек
+
+    if (this.reconnectAttempts <= maxAttempts) {
+      console.log(`🔄 Попытка переподключения ${this.reconnectAttempts}/${maxAttempts} через ${delay/1000}с...`)
+
+      this.reconnectTimeout = setTimeout(() => {
+        if (consumer.connection.disconnected) {
+          consumer.connection.open()
+        }
+      }, delay)
+    } else {
+      console.log("❌ Превышено максимальное количество попыток переподключения")
+      this.showConnectionStatus('failed')
+    }
+  }
+
+  // Показать статус подключения (опционально - можно добавить UI индикатор)
+  showConnectionStatus(status) {
+    // Сохраняем статус для возможного отображения
+    this.connectionStatus = status
+
+    // Можно добавить визуальный индикатор, например:
+    // - Зеленая точка при connected
+    // - Желтая при disconnected + попытка переподключения
+    // - Красная при failed
+
+    // Для мобильных устройств можно показывать небольшое уведомление
+    if (status === 'disconnected' && this.reconnectAttempts === 0) {
+      console.log("⚠️ Потеряно соединение с сервером, переподключаемся...")
+    } else if (status === 'connected' && this.reconnectAttempts > 0) {
+      console.log("✅ Соединение восстановлено!")
+    }
   }
 
   handleNewMessage(data) {
@@ -663,6 +723,91 @@ export default class extends Controller {
     if (this.hasMessagesTarget) {
       this.messagesTarget.scrollTop = this.messagesTarget.scrollHeight
     }
+  }
+
+  // Мобильная навигация: вернуться к списку чатов
+  goBackToList(event) {
+    event.preventDefault()
+
+    // Переключаем URL без перезагрузки страницы
+    window.history.pushState({}, '', '/messenger')
+
+    // Скрываем чат, показываем список чатов
+    const mainPanel = document.querySelector('main[data-conversation-id]')
+    const sidebarPanel = this.conversationsSidebarTarget
+
+    if (mainPanel) {
+      // На мобильных прячем чат
+      mainPanel.classList.add('hidden', 'md:flex')
+      mainPanel.classList.remove('flex')
+    }
+
+    if (sidebarPanel) {
+      // На мобильных показываем список
+      sidebarPanel.classList.remove('hidden', 'md:flex')
+      sidebarPanel.classList.add('flex')
+    }
+
+    // Закрываем профиль если был открыт
+    if (this.hasProfileSidebarTarget && this.hasProfileOverlayTarget) {
+      this.profileSidebarTarget.classList.add('hidden')
+      this.profileSidebarTarget.classList.remove('flex')
+      this.profileOverlayTarget.classList.add('hidden')
+      document.body.style.overflow = ''
+    }
+
+    console.log('📱 Returned to conversations list')
+  }
+
+  // Показать/скрыть профиль на планшетах и мобильных
+  toggleProfile(event) {
+    event.preventDefault()
+
+    if (!this.hasProfileSidebarTarget || !this.hasProfileOverlayTarget) {
+      return
+    }
+
+    const sidebar = this.profileSidebarTarget
+    const overlay = this.profileOverlayTarget
+
+    // Проверяем, открыт ли профиль
+    const isOpen = !sidebar.classList.contains('hidden')
+
+    if (isOpen) {
+      this.closeProfile(event)
+    } else {
+      // Показываем overlay и sidebar
+      overlay.classList.remove('hidden')
+      sidebar.classList.remove('hidden')
+      sidebar.classList.add('flex')
+
+      // Блокируем скролл body на мобильных
+      document.body.style.overflow = 'hidden'
+
+      console.log('Profile opened')
+    }
+  }
+
+  // Закрыть профиль
+  closeProfile(event) {
+    event.preventDefault()
+
+    if (!this.hasProfileSidebarTarget || !this.hasProfileOverlayTarget) {
+      return
+    }
+
+    const sidebar = this.profileSidebarTarget
+    const overlay = this.profileOverlayTarget
+
+    // Скрываем overlay и sidebar
+    overlay.classList.add('hidden')
+    sidebar.classList.add('hidden')
+    sidebar.classList.remove('flex')
+
+    // Разблокируем скролл body
+    document.body.style.overflow = ''
+
+    console.log('Profile closed')
   }
 
   escapeHtml(text) {

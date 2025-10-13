@@ -4,36 +4,37 @@
 %>
 
 <div
-  class="<%= active ? 'bg-blue-50 border-l-4 border-blue-500' : 'hover:bg-gray-50 border-l-4 border-transparent' %> cursor-pointer transition-colors"
+  class="<%= active ? 'bg-blue-50 border-l-4 border-blue-500' : 'hover:bg-gray-50 active:bg-gray-100 border-l-4 border-transparent' %> cursor-pointer transition-colors touch-manipulation"
   data-conversation-id="<%= conversation.id %>"
   data-action="click->messenger#selectConversation"
 >
-  <div class="p-4">
-    <div class="flex items-start gap-3">
-      <!-- Аватарка -->
-      <%= user_avatar_or_initials(user, css_classes: "flex-shrink-0", size_classes: "w-12 h-12") %>
+  <!-- Увеличенный padding для touch-устройств: p-5 на мобильных, p-4 на десктопе -->
+  <div class="p-5 md:p-4 min-h-[72px]">
+    <div class="flex items-start gap-3 md:gap-3">
+      <!-- Аватарка - увеличена на мобильных -->
+      <%= user_avatar_or_initials(user, css_classes: "flex-shrink-0", size_classes: "w-14 h-14 md:w-12 md:h-12") %>
 
       <!-- Информация о чате -->
       <div class="flex-1 min-w-0">
         <div class="flex items-center justify-between mb-1">
-          <h4 class="font-semibold text-gray-900 truncate"><%= user.full_name %></h4>
+          <h4 class="font-semibold text-base md:text-base text-gray-900 truncate"><%= user.full_name %></h4>
           <% if last_msg %>
-            <span class="text-xs text-gray-500 flex-shrink-0 ml-2">
+            <span class="text-xs md:text-xs text-gray-500 flex-shrink-0 ml-2">
               <%= time_ago_in_words(last_msg.created_at) %> назад
             </span>
           <% end %>
         </div>
 
         <% if last_msg %>
-          <p class="text-sm text-gray-600 truncate">
+          <p class="text-sm md:text-sm text-gray-600 truncate leading-relaxed">
             <%= last_msg.outgoing? ? '📤 Вы: ' : '' %><%= last_msg.body %>
           </p>
         <% else %>
-          <p class="text-sm text-gray-400 italic">Нет сообщений</p>
+          <p class="text-sm md:text-sm text-gray-400 italic">Нет сообщений</p>
         <% end %>
 
         <% if conversation.unread_count > 0 %>
-          <span class="inline-block mt-2 px-2 py-0.5 bg-blue-500 text-white text-xs font-bold rounded-full">
+          <span class="inline-block mt-2 px-2.5 py-1 md:px-2 md:py-0.5 bg-blue-500 text-white text-xs font-bold rounded-full">
             <%= conversation.unread_count %>
           </span>
         <% end %>
