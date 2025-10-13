@@ -50,6 +50,41 @@ class MessengerController < ApplicationController
     end
   end
 
+  # PATCH /messenger/conversations/:id/mark_read
+  def mark_read
+    @conversation.mark_all_read!
+    render json: { success: true }
+  end
+
+  # DELETE /messenger/users/:id
+  def delete_user
+    # Дополнительная проверка прав админа
+    unless @current_user&.admin?
+      redirect_to messenger_path, alert: 'У вас нет прав для выполнения этого действия'
+      return
+    end
+
+    @user_to_delete = User.find_by(id: params[:id])
+
+    if @user_to_delete.nil?
+      redirect_to messenger_path, alert: 'Пользователь не найден'
+      return
+    end
+
+    # Не позволяем удалить самого себя
+    if @user_to_delete == @current_user
+      redirect_to messenger_path, alert: 'Вы не можете удалить свой аккаунт'
+      return
+    end
+
+    username = @user_to_delete.full_name
+
+    # Удаляем пользователя (каскадно удалятся conversations и messages благодаря dependent: :destroy)
+    @user_to_delete.destroy
+
+    redirect_to messenger_path, notice: "Пользователь #{username} и вся связанная информация успешно удалены"
+  end
+
   private
 
   def send_via_bot(body)
