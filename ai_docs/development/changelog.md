@@ -6,6 +6,57 @@ This document tracks all significant changes, features, and updates to the Bali 
 
 ---
 
+## [October 13, 2025] - Business API Owner Message Filtering
+
+### Fixed
+- **Business API Owner Message Filtering**
+  - Added check to ignore business messages from account owner
+  - Prevents owner's outgoing messages from appearing in messenger
+  - Only customer messages are now saved and displayed
+  - **File:** `app/controllers/auth_controller.rb` (lines 518-533)
+
+### Problem
+When business account owner writes to their customers via Telegram Business, those messages were incorrectly saved as "incoming" messages from the owner to themselves, creating a confusing "Owner → Owner" conversation in messenger.
+
+### Solution
+Added validation in `handle_business_message`:
+1. Find BusinessConnection by business_connection_id
+2. Check if message sender telegram_id matches connection owner's telegram_id
+3. If match → return early (ignore message)
+4. If no match → process as customer message
+
+**Code:**
+```ruby
+# auth_controller.rb (lines 518-533)
+business_conn = BusinessConnection.find_by(business_connection_id: business_connection_id)
+
+unless business_conn
+  Rails.logger.warn "❌ Business connection not found"
+  return
+end
+
+# Ignore messages from owner
+if from["id"] == business_conn.user.telegram_id
+  Rails.logger.info "⏭️  Ignoring business message from owner"
+  return
+end
+```
+
+### Impact
+- Owner's outgoing messages no longer pollute messenger
+- Messenger only shows genuine customer conversations
+- Cleaner admin dashboard experience
+- Standard practice for Telegram Business API integrations
+
+### Cleanup
+To remove existing incorrect conversation (run in Rails console after deploy):
+```ruby
+owner_conversation = Conversation.joins(:user).where(users: { telegram_id: YOUR_TELEGRAM_ID }).first
+owner_conversation.destroy if owner_conversation
+```
+
+---
+
 ## [October 13, 2025] - N8N Business API Channel Routing
 
 ### Added
@@ -781,4 +832,4 @@ For questions, bug reports, or feature requests:
 
 ---
 
-**Last Updated:** October 13, 2025 (N8N Business API Channel Routing)
+**Last Updated:** October 13, 2025 (Business API Owner Message Filtering)

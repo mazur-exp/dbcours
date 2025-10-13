@@ -515,6 +515,23 @@ class AuthController < ApplicationController
     Rails.logger.info "📨 Business message from #{from['id']}: #{text}"
     Rails.logger.info "📨 Business connection ID: #{business_connection_id}"
 
+    # Находим business connection
+    business_conn = BusinessConnection.find_by(business_connection_id: business_connection_id)
+
+    unless business_conn
+      Rails.logger.warn "❌ Business connection not found: #{business_connection_id}"
+      return
+    end
+
+    # КРИТИЧЕСКАЯ ПРОВЕРКА: Игнорируем сообщения от owner бизнес-аккаунта
+    # Owner пишет своим клиентам → эти сообщения НЕ должны попадать в messenger
+    if from["id"] == business_conn.user.telegram_id
+      Rails.logger.info "⏭️  Ignoring business message from owner (#{from['id']})"
+      return
+    end
+
+    Rails.logger.info "✅ Business message from customer (not owner)"
+
     # Находим или создаём пользователя
     user = User.find_or_initialize_by(telegram_id: from["id"])
     user.assign_attributes(

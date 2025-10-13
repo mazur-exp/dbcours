@@ -117,6 +117,79 @@ add_index :messages, [:conversation_id, :source_type]
 - Triggers AI processing (same as bot messages)
 - Broadcasts to messenger with source indicator
 
+### Owner Message Filtering
+
+**Problem:**
+
+When a business account owner writes to their customers via Telegram Business, those outgoing messages were incorrectly saved as "incoming" messages in the messenger dashboard. This created a confusing "Owner → Owner" conversation where the owner's outgoing messages appeared as if they were sending messages to themselves.
+
+**Solution:**
+
+Added validation in `handle_business_message` to check if the message sender is the business account owner. If yes, the message is ignored and not saved to the database. Only genuine customer messages are processed.
+
+**Implementation:** `AuthController#handle_business_message` (lines 518-533)
+
+```ruby
+# Находим business connection
+business_conn = BusinessConnection.find_by(business_connection_id: business_connection_id)
+
+unless business_conn
+  Rails.logger.warn "❌ Business connection not found: #{business_connection_id}"
+  return
+end
+
+# КРИТИЧЕСКАЯ ПРОВЕРКА: Игнорируем сообщения от owner бизнес-аккаунта
+# Owner пишет своим клиентам → эти сообщения НЕ должны попадать в messenger
+if from["id"] == business_conn.user.telegram_id
+  Rails.logger.info "⏭️  Ignoring business message from owner (#{from['id']})"
+  return
+end
+
+Rails.logger.info "✅ Business message from customer (not owner)"
+```
+
+**Workflow:**
+
+1. Telegram sends `business_message` webhook when ANY message is sent in business chat
+2. Rails finds the BusinessConnection by `business_connection_id`
+3. Rails checks if message sender's `telegram_id` matches connection owner's `telegram_id`
+4. **If match** → Return early (ignore message) → Log: `⏭️  Ignoring business message from owner`
+5. **If no match** → Process as customer message → Log: `✅ Business message from customer (not owner)`
+
+**Logging Examples:**
+
+```
+# Owner sends message to customer (IGNORED)
+⏭️  Ignoring business message from owner (123456789)
+
+# Customer sends message to owner (PROCESSED)
+✅ Business message from customer (not owner)
+📨 Business message from customer 987654321: "Hello, I have a question"
+```
+
+**Why This Is Necessary:**
+
+This is standard practice for Telegram Business API integrations. The Business API sends webhooks for ALL messages in business chats, including:
+- Customer → Owner (should be saved)
+- Owner → Customer (should be ignored)
+
+Without this filtering, the owner's outgoing messages would pollute the messenger dashboard and create duplicate/confusing conversations.
+
+**Cleanup:**
+
+To remove existing incorrect "Owner → Owner" conversation (run in Rails console after deploy):
+
+```ruby
+# Find owner user
+owner = User.find_by(telegram_id: YOUR_TELEGRAM_ID)
+
+# Find conversation where user is talking to themselves
+owner_conversation = Conversation.where(user: owner).first
+
+# Destroy if exists
+owner_conversation.destroy if owner_conversation
+```
+
 ---
 
 ## Sending Messages
@@ -477,4 +550,4 @@ Message.where.not(business_connection_id: nil).count
 
 ---
 
-**Last Updated:** October 13, 2025
+**Last Updated:** October 13, 2025 (Owner Message Filtering)
