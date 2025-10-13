@@ -143,12 +143,6 @@ class MessengerController < ApplicationController
     end
   end
 
-  # PATCH /messenger/conversations/:id/mark_read
-  def mark_read
-    @conversation.mark_all_read!
-    render json: { success: true }
-  end
-
   # DELETE /messenger/users/:id
   def delete_user
     # Дополнительная проверка прав админа
