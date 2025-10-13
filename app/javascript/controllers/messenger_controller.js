@@ -10,6 +10,8 @@ export default class extends Controller {
     "tabBot",
     "tabBotOnly",
     "tabBusiness",
+    // AI Control
+    "aiPauseButton",
     // AI Qualification targets
     "aiQualificationSection",
     "aiQualificationContent",
@@ -106,6 +108,8 @@ export default class extends Controller {
 
         if (data.type === "new_message") {
           this.handleNewMessage(data)
+        } else if (data.type === "ai_pause_toggled") {
+          this.handleAiPauseToggled(data)
         }
       }
     })
@@ -141,6 +145,14 @@ export default class extends Controller {
     // Обновляем правую панель если это активная беседа
     if (String(conversationId) === String(this.activeConversationId) && conversation) {
       this.updateSidebar(conversation)
+    }
+  }
+
+  handleAiPauseToggled(data) {
+    // Обновляем кнопку только если это для активной беседы
+    if (String(data.conversation_id) === String(this.activeConversationId)) {
+      this.updateAiPauseButton(data.ai_paused)
+      console.log('AI pause status updated via broadcast:', data.ai_paused)
     }
   }
 
@@ -584,6 +596,67 @@ export default class extends Controller {
     } catch (error) {
       console.error('Failed to mark as read:', error)
     }
+  }
+
+  async toggleAiPause(event) {
+    event.preventDefault()
+
+    if (!this.activeConversationId) {
+      console.error('No active conversation')
+      return
+    }
+
+    const button = this.aiPauseButtonTarget
+
+    try {
+      const response = await fetch(`/messenger/conversations/${this.activeConversationId}/toggle_ai_pause`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': document.querySelector('[name="csrf-token"]').content
+        }
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Обновляем кнопку
+        this.updateAiPauseButton(data.ai_paused)
+        console.log('AI pause toggled:', data.message)
+      } else {
+        alert('Не удалось изменить статус AI')
+      }
+    } catch (error) {
+      console.error('Failed to toggle AI pause:', error)
+      alert('Ошибка изменения статуса AI')
+    }
+  }
+
+  updateAiPauseButton(isPaused) {
+    const button = this.aiPauseButtonTarget
+
+    if (isPaused) {
+      // AI на паузе - показываем кнопку "Включить AI" (зеленая)
+      button.className = 'ml-auto px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 bg-green-100 text-green-700 hover:bg-green-200'
+      button.innerHTML = `
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        Включить AI
+      `
+    } else {
+      // AI активен - показываем кнопку "Пауза AI" (серая)
+      button.className = 'ml-auto px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 bg-gray-100 text-gray-700 hover:bg-gray-200'
+      button.innerHTML = `
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        Пауза AI
+      `
+    }
+
+    button.dataset.aiPaused = isPaused
   }
 
   scrollToBottom() {

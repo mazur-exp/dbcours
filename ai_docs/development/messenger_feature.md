@@ -1278,6 +1278,465 @@ static targets = [
 
 ---
 
+---
+
+## AI Pause Control
+
+### Overview
+
+The AI Pause Control feature allows admins to temporarily pause the AI auto-responder for specific conversations and take over manually when needed. This provides flexibility to handle complex, sensitive, or high-priority conversations with a human touch.
+
+**Status:** ✅ Active (Added October 13, 2025)
+
+**Use Cases:**
+- **Complex discussions** - Pause AI when customer needs nuanced conversation
+- **Hot leads** - Pause AI for personalized sales approach (ready score 8+)
+- **Technical support** - Pause AI when expert knowledge required
+- **Routine questions** - Resume AI for automated handling
+
+---
+
+### UI Components
+
+**Location:** Channel tab bar in `/messenger` (next to 🤖 Бот / 👤 Бизнес tabs)
+
+**File:** `app/views/messenger/index.html.erb` (Lines 88-106)
+
+**Visual Design:**
+- Positioned on same line as channel tabs, aligned right with `ml-auto`
+- Two states with distinct visual indicators:
+  - **AI Active:** Gray button "Пауза AI" (`bg-gray-100 text-gray-700`)
+  - **AI Paused:** Green button "Включить AI" (`bg-green-100 text-green-700`)
+- SVG icons: Pause icon (⏸) when active, Play icon (▶️) when paused
+
+**Button HTML:**
+```erb
+<button
+  data-messenger-target="aiPauseButton"
+  data-action="click->messenger#toggleAiPause"
+  data-ai-paused="<%= @active_conversation.ai_paused %>"
+  class="ml-auto px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 <%= @active_conversation.ai_paused ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' %>">
+  <% if @active_conversation.ai_paused %>
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    Включить AI
+  <% else %>
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    Пауза AI
+  <% end %>
+</button>
+```
+
+---
+
+### Backend Implementation
+
+**Database Schema:**
+
+```ruby
+# db/migrate/20251013111309_add_ai_paused_to_conversations.rb
+add_column :conversations, :ai_paused, :boolean, default: false, null: false
+```
+
+**Controller Action:**
+
+**File:** `app/controllers/messenger_controller.rb` (Lines 63-81)
+
+**Route:** `PATCH /messenger/conversations/:id/toggle_ai_pause`
+
+```ruby
+def toggle_ai_pause
+  @conversation.update!(ai_paused: !@conversation.ai_paused)
+
+  Rails.logger.info "AI #{@conversation.ai_paused ? 'paused' : 'resumed'} for conversation #{@conversation.id}"
+
+  # Broadcast обновление состояния паузы всем админам
+  ActionCable.server.broadcast("messenger_channel", {
+    type: 'ai_pause_toggled',
+    conversation_id: @conversation.id,
+    ai_paused: @conversation.ai_paused
+  })
+
+  render json: {
+    success: true,
+    ai_paused: @conversation.ai_paused,
+    message: @conversation.ai_paused ? 'AI приостановлен' : 'AI активирован'
+  }
+end
+```
+
+**Before Action:**
+```ruby
+# Line 5
+before_action :set_conversation, only: [:messages, :send_message, :mark_read, :toggle_ai_pause]
+```
+
+---
+
+### JavaScript Implementation
+
+**File:** `app/javascript/controllers/messenger_controller.js`
+
+**Stimulus Target:**
+```javascript
+// Line 14
+static targets = [
+  "aiPauseButton",
+  // ... other targets
+]
+```
+
+**Method: toggleAiPause() (Lines 457-489)**
+
+Sends PATCH request to toggle AI pause state:
+
+```javascript
+async toggleAiPause(event) {
+  event.preventDefault()
+
+  if (!this.activeConversationId) {
+    console.error('No active conversation')
+    return
+  }
+
+  const button = this.aiPauseButtonTarget
+
+  try {
+    const response = await fetch(`/messenger/conversations/${this.activeConversationId}/toggle_ai_pause`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': document.querySelector('[name="csrf-token"]').content
+      }
+    })
+
+    const data = await response.json()
+
+    if (data.success) {
+      // Обновляем кнопку
+      this.updateAiPauseButton(data.ai_paused)
+      console.log('AI pause toggled:', data.message)
+    } else {
+      alert('Не удалось изменить статус AI')
+    }
+  } catch (error) {
+    console.error('Failed to toggle AI pause:', error)
+    alert('Ошибка изменения статуса AI')
+  }
+}
+```
+
+**Method: updateAiPauseButton() (Lines 491-516)**
+
+Updates button appearance based on pause state:
+
+```javascript
+updateAiPauseButton(isPaused) {
+  const button = this.aiPauseButtonTarget
+
+  if (isPaused) {
+    // AI на паузе - показываем кнопку "Включить AI" (зеленая)
+    button.className = 'ml-auto px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 bg-green-100 text-green-700 hover:bg-green-200'
+    button.innerHTML = `
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      Включить AI
+    `
+  } else {
+    // AI активен - показываем кнопку "Пауза AI" (серая)
+    button.className = 'ml-auto px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 bg-gray-100 text-gray-700 hover:bg-gray-200'
+    button.innerHTML = `
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      Пауза AI
+    `
+  }
+
+  button.dataset.aiPaused = isPaused
+}
+```
+
+**Method: handleAiPauseToggled() (Lines 151-157)**
+
+Handles real-time updates from other admin sessions via ActionCable:
+
+```javascript
+handleAiPauseToggled(data) {
+  // Обновляем кнопку только если это для активной беседы
+  if (String(data.conversation_id) === String(this.activeConversationId)) {
+    this.updateAiPauseButton(data.ai_paused)
+    console.log('AI pause status updated via broadcast:', data.ai_paused)
+  }
+}
+```
+
+**Updated received() handler (Lines 106-114):**
+
+```javascript
+received: (data) => {
+  console.log("Received from MessengerChannel:", data)
+
+  if (data.type === "new_message") {
+    this.handleNewMessage(data)
+  } else if (data.type === "ai_pause_toggled") {
+    this.handleAiPauseToggled(data)
+  }
+}
+```
+
+---
+
+### AI Filtering Logic
+
+The `ai_paused` flag prevents AI webhook calls when conversation is paused.
+
+**File:** `app/controllers/auth_controller.rb`
+
+**In handle_text_message() (Lines 333-348):**
+
+Checks `ai_paused` before triggering N8N webhook for bot messages:
+
+```ruby
+# Reload conversation для получения актуального last_message_at и unread_count
+conversation.reload
+
+# Проверяем, не на паузе ли AI для этой беседы
+if conversation.ai_paused
+  Rails.logger.info "🚫 AI paused for conversation #{conversation.id}, skipping N8N webhook"
+else
+  # Устанавливаем флаг что AI обрабатывает сообщение
+  conversation.update!(ai_processing: true)
+
+  # Отправляем первый typing indicator сразу
+  send_typing_action(telegram_id)
+
+  # Запускаем фоновую задачу для продолжения typing индикатора
+  TypingIndicatorJob.set(wait: 4.seconds).perform_later(conversation.id)
+
+  # Отправляем сообщение на N8N
+  send_message_to_n8n(msg, user, conversation)
+end
+```
+
+**In handle_business_message() (Lines 567-578):**
+
+Same logic applied to business messages:
+
+```ruby
+conversation.reload
+
+# Проверяем, не на паузе ли AI для этой беседы
+if conversation.ai_paused
+  Rails.logger.info "🚫 AI paused for conversation #{conversation.id}, skipping N8N webhook"
+else
+  # Устанавливаем флаг AI обработки (typing indicator)
+  conversation.update!(ai_processing: true)
+  send_typing_action(user.telegram_id)
+  TypingIndicatorJob.set(wait: 4.seconds).perform_later(conversation.id)
+
+  # Отправляем в N8N (как обычно)
+  send_message_to_n8n(msg, user, conversation)
+end
+```
+
+**Result:**
+- When `ai_paused = true`: Incoming messages are saved to database and broadcasted to admin, but N8N webhook is skipped
+- No typing indicator shown to customer
+- No AI processing triggered
+- Admin can respond manually
+
+---
+
+### Real-Time Updates
+
+**ActionCable Broadcast:**
+
+**Broadcast Type:** `ai_pause_toggled`
+
+**Payload:**
+```javascript
+{
+  type: 'ai_pause_toggled',
+  conversation_id: 123,
+  ai_paused: true
+}
+```
+
+**Behavior:**
+- When admin toggles AI pause in one browser/tab
+- Rails broadcasts `ai_pause_toggled` event
+- All other admin sessions receive the broadcast
+- Buttons update automatically without page refresh
+
+**Example:**
+1. Admin A opens conversation, clicks "Пауза AI"
+2. Backend broadcasts `{type: 'ai_pause_toggled', conversation_id: 123, ai_paused: true}`
+3. Admin B (who has same conversation open) sees button turn green "Включить AI" automatically
+
+---
+
+### Workflow Example
+
+**Scenario:** Hot lead ready to buy (ready score: 9)
+
+**Before AI Pause:**
+1. Customer: "What's the price for VIP tier?"
+2. AI: "VIP tier is $3,000. Includes..."
+3. Customer: "Can I get a discount?"
+4. AI: "Unfortunately we don't offer..."
+
+**With AI Pause:**
+1. Customer: "What's the price for VIP tier?"
+2. Admin sees ready score: 9/10 (🟢 Горячий лид)
+3. Admin clicks "⏸ Пауза AI" (button turns green)
+4. AI auto-responder is now disabled for this conversation
+5. Customer: "Can I get a discount?"
+6. **No AI response** (N8N webhook skipped)
+7. Admin responds manually: "Absolutely! For serious buyers like you, I can offer 15% off. Let me send you a personalized proposal..."
+8. Customer: "Great! Send it please"
+9. Admin handles sale personally
+10. After sale closes, admin clicks "▶️ Включить AI" to resume automation
+
+---
+
+### Integration with AI Auto-Responder
+
+**Related Documentation:** See `ai_auto_responder.md` for:
+- How AI processing works
+- N8N webhook integration
+- Typing indicator implementation
+
+**Data Flow with AI Pause:**
+
+```
+User Message → Telegram → Rails (AuthController)
+                            ↓
+                      Check ai_paused flag
+                            ↓
+                ┌───────────┴──────────┐
+                │                      │
+         ai_paused = true       ai_paused = false
+                │                      │
+         Skip N8N webhook       Start typing indicator
+         Admin handles manually        ↓
+                                N8N webhook (AI)
+                                       ↓
+                                 AI response
+```
+
+**Technical Implementation:**
+
+**Route Configuration:**
+```ruby
+# config/routes.rb (Line 23)
+patch 'conversations/:id/toggle_ai_pause', to: 'messenger#toggle_ai_pause'
+```
+
+---
+
+### Testing
+
+**Manual Testing:**
+
+1. Open messenger dashboard
+2. Select conversation
+3. Click "⏸ Пауза AI" button
+4. Verify:
+   - Button turns green with "Включить AI" text
+   - Play icon (▶️) appears
+5. Send message from Telegram as user
+6. Verify:
+   - Message appears in admin dashboard
+   - No AI response sent to user
+   - No typing indicator shown
+   - Log shows: "🚫 AI paused for conversation X, skipping N8N webhook"
+7. Admin responds manually
+8. Click "▶️ Включить AI" button
+9. Verify:
+   - Button turns gray with "Пауза AI" text
+   - Pause icon (⏸) appears
+10. Send message from Telegram
+11. Verify:
+    - AI responds automatically
+    - Typing indicator appears
+    - Log shows N8N webhook sent
+
+**Multi-Session Testing:**
+
+1. Open conversation in Browser A
+2. Open same conversation in Browser B
+3. In Browser A, click "⏸ Пауза AI"
+4. Verify in Browser B:
+   - Button updates to "Включить AI" automatically
+   - No page refresh needed
+
+---
+
+### Security Considerations
+
+**Admin-Only Access:**
+- Only admins can toggle AI pause
+- `before_action :require_admin` enforced on MessengerController
+- No API endpoint exposed to non-admin users
+
+**CSRF Protection:**
+- All PATCH requests include CSRF token
+- Standard Rails protection applies
+
+---
+
+### Future Enhancements
+
+**Potential Features:**
+
+1. **Auto-pause on hot leads:**
+   ```ruby
+   # Automatically pause AI when ready_score >= 9
+   if conversation.ai_ready_score.to_i >= 9
+     conversation.update!(ai_paused: true)
+     AdminNotification.hot_lead_alert(conversation)
+   end
+   ```
+
+2. **Pause with reason:**
+   ```ruby
+   # Track why AI was paused
+   add_column :conversations, :ai_pause_reason, :string
+   # Reasons: 'manual', 'hot_lead', 'complex_issue', 'technical_support'
+   ```
+
+3. **Auto-resume after timeout:**
+   ```ruby
+   # Resume AI after 30 minutes of inactivity
+   class ResumeAiJob < ApplicationJob
+     def perform(conversation_id)
+       conversation = Conversation.find(conversation_id)
+       if conversation.ai_paused && conversation.last_message_at < 30.minutes.ago
+         conversation.update!(ai_paused: false)
+       end
+     end
+   end
+   ```
+
+4. **Pause notifications:**
+   ```ruby
+   # Notify admin when AI is paused
+   ActionCable.server.broadcast("admin_notifications", {
+     type: 'ai_paused',
+     conversation_id: conversation.id,
+     user_name: conversation.user.full_name
+   })
+   ```
+
+---
+
 ## Conclusion
 
 The messenger feature provides a complete admin communication interface integrated with Telegram. Real-time WebSocket updates ensure instant message delivery, while avatar synchronization creates a polished user experience. The new AI qualification display gives admins instant visibility into lead quality and customer context, enabling prioritized and personalized responses.
@@ -1287,7 +1746,10 @@ The messenger feature provides a complete admin communication interface integrat
 - Avatar synchronization from Telegram
 - **AI-powered lead qualification** ✨
 - **Color-coded readiness scoring** ✨
+- **AI Pause Control for manual intervention** ✨
 - Clean Stimulus-based architecture
 - Admin access control
 - Graceful error handling
 - Foundation for future enhancements
+
+**Last Updated:** October 13, 2025

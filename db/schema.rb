@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_10_13_073842) do
+ActiveRecord::Schema[8.0].define(version: 2025_10_13_111309) do
   create_table "business_connections", force: :cascade do |t|
     t.string "business_connection_id", null: false
     t.integer "user_id", null: false
@@ -38,6 +38,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_13_073842) do
     t.text "ai_query"
     t.integer "ai_ready_score"
     t.boolean "ai_processing", default: false
+    t.boolean "ai_paused", default: false, null: false
     t.index ["last_message_at"], name: "index_conversations_on_last_message_at"
     t.index ["user_id"], name: "index_conversations_on_user_id"
   end

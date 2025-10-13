@@ -20,6 +20,7 @@ Rails.application.routes.draw do
   get "messenger/conversations/:id/messages", to: "messenger#messages", as: :messenger_conversation_messages
   post "messenger/conversations/:id/messages", to: "messenger#send_message", as: :messenger_send_message
   patch "messenger/conversations/:id/mark_read", to: "messenger#mark_read", as: :messenger_mark_read
+  patch "messenger/conversations/:id/toggle_ai_pause", to: "messenger#toggle_ai_pause", as: :messenger_toggle_ai_pause
   delete "messenger/users/:id", to: "messenger#delete_user", as: :messenger_delete_user
 
   # Business Connections (Admin only)

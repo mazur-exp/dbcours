@@ -330,17 +330,22 @@ class AuthController < ApplicationController
     # Reload conversation для получения актуального last_message_at и unread_count
     conversation.reload
 
-    # Устанавливаем флаг что AI обрабатывает сообщение
-    conversation.update!(ai_processing: true)
+    # Проверяем, не на паузе ли AI для этой беседы
+    if conversation.ai_paused
+      Rails.logger.info "🚫 AI paused for conversation #{conversation.id}, skipping N8N webhook"
+    else
+      # Устанавливаем флаг что AI обрабатывает сообщение
+      conversation.update!(ai_processing: true)
 
-    # Отправляем первый typing indicator сразу
-    send_typing_action(telegram_id)
+      # Отправляем первый typing indicator сразу
+      send_typing_action(telegram_id)
 
-    # Запускаем фоновую задачу для продолжения typing индикатора
-    TypingIndicatorJob.set(wait: 4.seconds).perform_later(conversation.id)
+      # Запускаем фоновую задачу для продолжения typing индикатора
+      TypingIndicatorJob.set(wait: 4.seconds).perform_later(conversation.id)
 
-    # Отправляем сообщение на N8N
-    send_message_to_n8n(msg, user, conversation)
+      # Отправляем сообщение на N8N
+      send_message_to_n8n(msg, user, conversation)
+    end
 
     # Broadcast через ActionCable для real-time обновления
     ActionCable.server.broadcast("messenger_channel", {
@@ -559,13 +564,18 @@ class AuthController < ApplicationController
 
     conversation.reload
 
-    # Устанавливаем флаг AI обработки (typing indicator)
-    conversation.update!(ai_processing: true)
-    send_typing_action(user.telegram_id)
-    TypingIndicatorJob.set(wait: 4.seconds).perform_later(conversation.id)
+    # Проверяем, не на паузе ли AI для этой беседы
+    if conversation.ai_paused
+      Rails.logger.info "🚫 AI paused for conversation #{conversation.id}, skipping N8N webhook"
+    else
+      # Устанавливаем флаг AI обработки (typing indicator)
+      conversation.update!(ai_processing: true)
+      send_typing_action(user.telegram_id)
+      TypingIndicatorJob.set(wait: 4.seconds).perform_later(conversation.id)
 
-    # Отправляем в N8N (как обычно)
-    send_message_to_n8n(msg, user, conversation)
+      # Отправляем в N8N (как обычно)
+      send_message_to_n8n(msg, user, conversation)
+    end
 
     # Broadcast в messenger с указанием source_type
     ActionCable.server.broadcast("messenger_channel", {

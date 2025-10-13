@@ -2,7 +2,7 @@ require 'telegram/bot'
 
 class MessengerController < ApplicationController
   before_action :require_admin
-  before_action :set_conversation, only: [:messages, :send_message, :mark_read]
+  before_action :set_conversation, only: [:messages, :send_message, :mark_read, :toggle_ai_pause]
 
   def index
     @conversations = Conversation.includes(:user, :messages)
@@ -58,6 +58,26 @@ class MessengerController < ApplicationController
   def mark_read
     @conversation.mark_all_read!
     render json: { success: true }
+  end
+
+  # PATCH /messenger/conversations/:id/toggle_ai_pause
+  def toggle_ai_pause
+    @conversation.update!(ai_paused: !@conversation.ai_paused)
+
+    Rails.logger.info "AI #{@conversation.ai_paused ? 'paused' : 'resumed'} for conversation #{@conversation.id}"
+
+    # Broadcast обновление состояния паузы всем админам
+    ActionCable.server.broadcast("messenger_channel", {
+      type: 'ai_pause_toggled',
+      conversation_id: @conversation.id,
+      ai_paused: @conversation.ai_paused
+    })
+
+    render json: {
+      success: true,
+      ai_paused: @conversation.ai_paused,
+      message: @conversation.ai_paused ? 'AI приостановлен' : 'AI активирован'
+    }
   end
 
   # DELETE /messenger/users/:id
