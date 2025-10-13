@@ -35,14 +35,19 @@ class MessengerController < ApplicationController
   # POST /messenger/conversations/:id/messages
   def send_message
     body = params[:body]
-    source_type = params[:source_type] || 'bot'  # 'bot' или 'business'
 
     if body.blank?
       render json: { error: 'Message cannot be blank' }, status: :unprocessable_entity
       return
     end
 
-    # Определяем через какой канал отправлять
+    # Автоматически определяем source через какой канал пришло последнее сообщение от клиента
+    last_incoming = @conversation.messages.incoming.order(created_at: :desc).first
+    source_type = last_incoming&.source_type || 'bot'
+
+    Rails.logger.info "Auto-detected source_type: #{source_type} (last incoming message: #{last_incoming&.id})"
+
+    # Отправляем через тот же канал что и получили
     if source_type == 'business'
       send_via_business_connection(body)
     else
