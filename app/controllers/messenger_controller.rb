@@ -178,6 +178,8 @@ class MessengerController < ApplicationController
     redirect_to messenger_path, notice: "Пользователь #{username} и вся связанная информация успешно удалены"
   end
 
+  private
+
   def send_via_business_connection(body)
     # Находим активный business connection для пользователя
     business_conn = @conversation.user.business_connections.active_connections.first
