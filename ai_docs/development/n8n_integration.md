@@ -362,6 +362,343 @@ telegram:
 
 ---
 
+## Channel Routing for Business API
+
+**Status:** ✅ Implemented (October 13, 2025)
+
+### Overview
+
+N8N integration now supports automatic channel routing for Telegram Business API. When a customer writes via the business account OR the bot, N8N receives channel information and can respond through the same channel automatically.
+
+**Key Benefit:** If a customer writes via business account, the AI response will also come from the business account. If they write via the bot, the response comes from the bot. No manual configuration needed.
+
+---
+
+### How It Works
+
+**Workflow:**
+
+```
+1. Customer writes to bot OR business account
+   ↓
+2. Rails webhook sends to N8N with source_type + business_connection_id
+   ↓
+3. N8N processes message (AI, FAQ, etc.)
+   ↓
+4. N8N returns response with same source_type + business_connection_id
+   ↓
+5. Rails routes response through matching channel
+   ↓
+6. Customer receives response from same channel they used
+```
+
+---
+
+### Outgoing Webhook (Rails → N8N)
+
+**Enhanced Payload Structure:**
+
+N8N webhook now receives two additional fields for channel routing:
+
+```json
+{
+  "event": "message_received",
+  "message_id": 123,
+  "telegram_message_id": 456789,
+  "text": "Hello, I have a question",
+  "timestamp": "2025-10-13T14:30:00Z",
+  "conversation_id": 45,
+  "callback_url": "https://crm.aidelivery.tech/api/n8n/send_message",
+  "source_type": "business",
+  "business_connection_id": "ABCD1234567890",
+  "user": {
+    "id": 12,
+    "telegram_id": 987654321,
+    "username": "johndoe",
+    "first_name": "John",
+    "last_name": "Doe",
+    "avatar_url": "https://api.telegram.org/file/bot.../photo.jpg"
+  },
+  "conversation_history": "..."
+}
+```
+
+**New Fields:**
+
+- **`source_type`** - Channel type: "bot" or "business"
+  - `"bot"` - Message came through regular bot chat
+  - `"business"` - Message came through Telegram Business account
+- **`business_connection_id`** - Business connection ID (only present for business messages)
+  - Example: `"ABCD1234567890"`
+  - `null` or absent for bot messages
+
+**Implementation:**
+
+```ruby
+# app/controllers/auth_controller.rb (lines 405-406)
+payload = {
+  # ... other fields ...
+  source_type: message.source_type,  # bot or business
+  business_connection_id: message.business_connection_id,  # для business messages
+  # ...
+}
+```
+
+---
+
+### Incoming API (N8N → Rails)
+
+**Updated Endpoint:** `POST /api/n8n/send_message`
+
+N8N must now return `source_type` and `business_connection_id` in the response to enable automatic channel routing.
+
+**Request Format:**
+
+```http
+POST https://crm.aidelivery.tech/api/n8n/send_message
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+
+{
+  "telegram_id": 987654321,
+  "text": "**Спасибо за вопрос!** Вот ответ...",
+  "source_type": "business",
+  "business_connection_id": "ABCD1234567890"
+}
+```
+
+**Parameters:**
+
+- `telegram_id` (required) - Telegram user ID
+- `text` (required) - Message text (Markdown supported)
+- **`source_type`** (optional, default: "bot") - Channel to use: "bot" or "business"
+- **`business_connection_id`** (optional) - Required for business messages
+
+---
+
+### Channel Routing Logic
+
+**Implementation:** `app/controllers/n8n_controller.rb` (lines 16-17, 69-86, 94-95)
+
+```ruby
+# app/controllers/n8n_controller.rb
+
+def send_message
+  telegram_id = params[:telegram_id]
+  text = params[:text]
+
+  # NEW: Channel parameters
+  source_type = params[:source_type] || 'bot'
+  business_connection_id = params[:business_connection_id]
+
+  # ... user lookup ...
+
+  # Channel routing
+  if source_type == 'business' && business_connection_id.present?
+    # Отправляем через Business Connection
+    result = bot_client.api.send_message(
+      business_connection_id: business_connection_id,
+      chat_id: telegram_id,
+      text: text_to_send,
+      parse_mode: 'Markdown'
+    )
+  else
+    # Отправляем через обычного бота
+    result = bot_client.api.send_message(
+      chat_id: telegram_id,
+      text: text_to_send,
+      parse_mode: 'Markdown'
+    )
+  end
+
+  # Save with source_type
+  msg = Message.create!(
+    conversation: conversation,
+    user: user,
+    body: text_to_send,
+    direction: :outgoing,
+    telegram_message_id: result['result']['message_id'],
+    read: true,
+    source_type: source_type,  # bot или business
+    business_connection_id: business_connection_id  # для business messages
+  )
+end
+```
+
+**Fallback Logic:**
+
+If Telegram API fails (e.g., business connection expired), the endpoint automatically falls back to bot channel:
+
+```ruby
+# app/controllers/n8n_controller.rb (lines 147-158)
+rescue Telegram::Bot::Error => e
+  Rails.logger.error "Telegram API error: #{e.message}"
+
+  # Fallback: retry via bot
+  if source_type == 'business'
+    result = bot_client.api.send_message(
+      chat_id: telegram_id,
+      text: text_to_send,
+      parse_mode: 'Markdown'
+    )
+    source_type = 'bot'  # Update to reflect actual channel used
+  end
+end
+```
+
+---
+
+### N8N Workflow Configuration
+
+**Example: AI Auto-Responder with Channel Routing**
+
+**Nodes:**
+
+1. **Webhook Trigger** - Receives `message_received` event
+
+2. **Function Node** - Extract channel info
+   ```javascript
+   return {
+     json: {
+       text: $json.text,
+       source_type: $json.source_type,  // bot or business
+       business_connection_id: $json.business_connection_id,  // for business
+       telegram_id: $json.user.telegram_id,
+       conversation_history: $json.conversation_history
+     }
+   }
+   ```
+
+3. **OpenAI/Claude Node** - AI processes message
+
+4. **HTTP Request Node** - Send response via Rails API
+   ```javascript
+   // HTTP Request configuration
+   URL: {{ $node["Webhook"].json.callback_url }}
+   Method: POST
+   Headers:
+     Authorization: Bearer {{$env.N8N_API_TOKEN}}
+     Content-Type: application/json
+   Body:
+     {
+       "telegram_id": {{ $json.telegram_id }},
+       "text": {{ $json.ai_response }},
+       "source_type": {{ $json.source_type }},  // PASS THROUGH!
+       "business_connection_id": {{ $json.business_connection_id }}  // PASS THROUGH!
+     }
+   ```
+
+**IMPORTANT:** N8N workflow MUST pass through `source_type` and `business_connection_id` from incoming webhook to outgoing API call. This ensures response uses same channel as incoming message.
+
+**Pass-Through Pattern:**
+
+```
+Incoming webhook → Extract fields → AI processing → Return same fields in response
+```
+
+---
+
+### Benefits
+
+**For Users:**
+- Seamless channel experience - response comes from same source
+- No confusion about which account replied
+- Business account maintains professional image
+
+**For N8N Workflows:**
+- Single workflow handles both bot and business channels
+- No manual channel selection logic needed
+- Automatic routing based on incoming message
+
+**For Admins:**
+- Channel context preserved automatically
+- No need to configure routing rules
+- Works out-of-the-box with existing workflows
+
+---
+
+### Example Scenarios
+
+**Scenario 1: Bot Message**
+
+```
+Customer writes to bot → source_type: "bot", business_connection_id: null
+   ↓
+N8N processes with AI
+   ↓
+N8N returns: {"source_type": "bot", "business_connection_id": null, ...}
+   ↓
+Rails sends via bot.send_message()
+   ↓
+Customer receives from bot
+```
+
+**Scenario 2: Business Message**
+
+```
+Customer writes to business account → source_type: "business", business_connection_id: "ABC123"
+   ↓
+N8N processes with AI
+   ↓
+N8N returns: {"source_type": "business", "business_connection_id": "ABC123", ...}
+   ↓
+Rails sends via bot.send_message(business_connection_id: "ABC123")
+   ↓
+Customer receives from business account
+```
+
+---
+
+### Testing Channel Routing
+
+**Test Bot Channel:**
+
+```bash
+curl -X POST https://crm.aidelivery.tech/api/n8n/send_message \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "telegram_id": 987654321,
+    "text": "Test message via bot",
+    "source_type": "bot"
+  }'
+```
+
+**Test Business Channel:**
+
+```bash
+curl -X POST https://crm.aidelivery.tech/api/n8n/send_message \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "telegram_id": 987654321,
+    "text": "Test message via business",
+    "source_type": "business",
+    "business_connection_id": "YOUR_CONNECTION_ID"
+  }'
+```
+
+**Verify in Logs:**
+
+```bash
+# Check which channel was used
+bin/kamal logs | grep "Sending message via"
+
+# Output:
+# Sending message via bot channel
+# Sending message via business channel
+```
+
+---
+
+### Related Documentation
+
+- **Business API Details:** See `telegram_business_api.md` for complete Business API documentation
+- **Messenger UI:** See `messenger_feature.md` for tab-based channel selection UI
+- **Database Schema:** `business_connections` and `messages` tables with `source_type`
+
+---
+
 ## N8N Workflow Examples
 
 ### Welcome Email Workflow
@@ -567,7 +904,7 @@ Response:
 
 **Endpoint:** `POST /api/n8n/send_message`
 
-**Purpose:** Позволяет N8N (или AI-workflow) отправлять сообщения клиентам через Telegram Bot
+**Purpose:** Позволяет N8N (или AI-workflow) отправлять сообщения клиентам через Telegram Bot или Business Connection
 
 **Authentication:** Bearer token (N8N_API_TOKEN)
 
@@ -580,13 +917,17 @@ Content-Type: application/json
 
 {
   "telegram_id": 1978625688,
-  "text": "**Привет!** Вот ответ на ваш вопрос:\n\n• Пункт 1\n• Пункт 2\n\nПодробнее: [ссылка](https://example.com)"
+  "text": "**Привет!** Вот ответ на ваш вопрос:\n\n• Пункт 1\n• Пункт 2\n\nПодробнее: [ссылка](https://example.com)",
+  "source_type": "business",
+  "business_connection_id": "ABCD1234567890"
 }
 ```
 
 **Fields:**
 - `telegram_id` (required) - Telegram user ID клиента
 - `text` (required) - Текст сообщения в Markdown формате
+- `source_type` (optional, default: "bot") - Channel to use: "bot" or "business"
+- `business_connection_id` (optional) - Required when source_type is "business"
 
 **Markdown Support:**
 - `**bold**` → **bold**
@@ -1143,3 +1484,8 @@ The N8N integration provides a flexible foundation for workflow automation in th
 - Environment-specific workflows (test vs production)
 - Scalable event-driven architecture
 - Easy to extend with new event types
+- Automatic channel routing for Business API
+
+---
+
+**Last Updated:** October 13, 2025

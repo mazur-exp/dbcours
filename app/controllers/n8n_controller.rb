@@ -6,13 +6,15 @@ class N8nController < ApplicationController
   # before_action :verify_n8n_token
 
   # POST /api/n8n/send_message
-  # Body: { telegram_id: 123456, text: "Message with **Markdown**" }
+  # Body: { telegram_id: 123456, text: "Message with **Markdown**", source_type: "bot|business", business_connection_id: "..." }
   def send_message
     Rails.logger.info "=== N8N send_message called ==="
     Rails.logger.info "Params: #{params.inspect}"
 
     telegram_id = params[:telegram_id]
     text_to_send = params[:text]
+    source_type = params[:source_type] || 'bot'  # Канал отправки (bot или business)
+    business_connection_id = params[:business_connection_id]  # Для business messages
 
     # Валидация параметров
     if telegram_id.blank?
@@ -62,13 +64,26 @@ class N8nController < ApplicationController
 
     Rails.logger.info "AI qualification saved for conversation #{conversation.id}"
 
-    # Отправляем сообщение через Telegram API с Markdown
+    # Отправляем сообщение через нужный канал (bot или business)
     begin
-      result = bot_client.api.send_message(
-        chat_id: telegram_id,
-        text: text_to_send,
-        parse_mode: 'Markdown'
-      )
+      if source_type == 'business' && business_connection_id.present?
+        # Отправляем через Business Connection
+        Rails.logger.info "Sending via Business Connection: #{business_connection_id}"
+        result = bot_client.api.send_message(
+          business_connection_id: business_connection_id,
+          chat_id: telegram_id,
+          text: text_to_send,
+          parse_mode: 'Markdown'
+        )
+      else
+        # Отправляем через обычного бота
+        Rails.logger.info "Sending via Bot"
+        result = bot_client.api.send_message(
+          chat_id: telegram_id,
+          text: text_to_send,
+          parse_mode: 'Markdown'
+        )
+      end
 
       Rails.logger.info "N8N → Telegram: message sent to user #{user.id}, message_id=#{result.message_id}"
 
@@ -76,6 +91,8 @@ class N8nController < ApplicationController
       message = conversation.messages.create!(
         body: text_to_send,
         direction: :outgoing,
+        source_type: source_type,  # bot или business
+        business_connection_id: business_connection_id,  # для business messages
         telegram_message_id: result.message_id,
         read: true,
         user_id: nil # от AI/бота
@@ -88,11 +105,11 @@ class N8nController < ApplicationController
       ActionCable.server.broadcast("messenger_channel", {
         type: 'new_message',
         conversation_id: conversation.id,
-        message: message.as_json(include: :user),
+        message: message.as_json(include: :user).merge(source_type: source_type),
         conversation: {
           id: conversation.id,
           user: user.as_json(only: [:id, :first_name, :last_name, :username, :avatar_url]),
-          last_message: message.as_json(only: [:id, :body, :direction, :created_at]),
+          last_message: message.as_json(only: [:id, :body, :direction, :created_at, :source_type]),
           unread_count: conversation.unread_count,
           last_message_at: conversation.last_message_at,
           # AI Qualification данные для real-time обновления sidebar
@@ -126,16 +143,27 @@ class N8nController < ApplicationController
         begin
           Rails.logger.warn "Markdown parse error detected, retrying without Markdown"
 
-          result = bot_client.api.send_message(
-            chat_id: telegram_id,
-            text: text_to_send
-          )
+          # Отправляем через тот же канал, но без Markdown
+          if source_type == 'business' && business_connection_id.present?
+            result = bot_client.api.send_message(
+              business_connection_id: business_connection_id,
+              chat_id: telegram_id,
+              text: text_to_send
+            )
+          else
+            result = bot_client.api.send_message(
+              chat_id: telegram_id,
+              text: text_to_send
+            )
+          end
 
           Rails.logger.info "Successfully sent as plain text (no Markdown)"
 
           message = conversation.messages.create!(
             body: text_to_send,
             direction: :outgoing,
+            source_type: source_type,
+            business_connection_id: business_connection_id,
             telegram_message_id: result.message_id,
             read: true,
             user_id: nil
@@ -147,11 +175,11 @@ class N8nController < ApplicationController
           ActionCable.server.broadcast("messenger_channel", {
             type: 'new_message',
             conversation_id: conversation.id,
-            message: message.as_json(include: :user),
+            message: message.as_json(include: :user).merge(source_type: source_type),
             conversation: {
               id: conversation.id,
               user: user.as_json(only: [:id, :first_name, :last_name, :username, :avatar_url]),
-              last_message: message.as_json(only: [:id, :body, :direction, :created_at]),
+              last_message: message.as_json(only: [:id, :body, :direction, :created_at, :source_type]),
               unread_count: conversation.unread_count,
               last_message_at: conversation.last_message_at,
               ai_qualification: {

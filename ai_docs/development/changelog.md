@@ -6,6 +6,121 @@ This document tracks all significant changes, features, and updates to the Bali 
 
 ---
 
+## [October 13, 2025] - N8N Business API Channel Routing
+
+### Added
+- **N8N Channel Routing for Business API**
+  - N8N webhook payload now includes `source_type` (bot/business)
+  - N8N webhook payload includes `business_connection_id` for business messages
+  - N8N responses route through correct channel automatically
+  - If client wrote via business → AI responds via business
+  - If client wrote via bot → AI responds via bot
+  - **Files:**
+    - `app/controllers/auth_controller.rb` (lines 405-406) - Added source_type to payload
+    - `app/controllers/n8n_controller.rb` (lines 16-17, 69-86, 94-95, 147-158) - Channel routing logic
+
+### Changed
+- **N8N Workflow Requirements**
+  - N8N must now return `source_type` and `business_connection_id` from webhook
+  - These fields pass through from incoming webhook to response
+  - Enables seamless channel routing without manual configuration
+
+### Technical Details
+
+**Workflow:**
+1. Client writes to bot OR business account
+2. Rails sends to N8N with source_type + business_connection_id
+3. N8N processes and returns same fields
+4. Rails routes response through matching channel
+
+**Code Example:**
+
+```ruby
+# N8nController routing (lines 69-86)
+if source_type == 'business' && business_connection_id.present?
+  result = bot_client.api.send_message(
+    business_connection_id: business_connection_id,
+    chat_id: telegram_id,
+    text: text_to_send
+  )
+else
+  result = bot_client.api.send_message(
+    chat_id: telegram_id,
+    text: text_to_send
+  )
+end
+```
+
+**Outgoing Webhook Payload (Rails → N8N):**
+
+```json
+{
+  "event": "message_received",
+  "text": "Customer message",
+  "source_type": "business",
+  "business_connection_id": "ABCD1234567890",
+  "callback_url": "https://crm.aidelivery.tech/api/n8n/send_message",
+  "user": { ... },
+  "conversation_history": "..."
+}
+```
+
+**Incoming API Request (N8N → Rails):**
+
+```json
+{
+  "telegram_id": 987654321,
+  "text": "AI response",
+  "source_type": "business",
+  "business_connection_id": "ABCD1234567890"
+}
+```
+
+**N8N Configuration:**
+
+N8N workflows must pass through `source_type` and `business_connection_id`:
+
+```javascript
+// HTTP Request Node Body
+{
+  "telegram_id": {{ $json.telegram_id }},
+  "text": {{ $json.ai_response }},
+  "source_type": {{ $json.source_type }},  // PASS THROUGH
+  "business_connection_id": {{ $json.business_connection_id }}  // PASS THROUGH
+}
+```
+
+**Fallback Logic:**
+
+If Business API fails (expired connection, etc.), Rails automatically falls back to bot channel:
+
+```ruby
+# N8nController (lines 147-158)
+rescue Telegram::Bot::Error => e
+  if source_type == 'business'
+    # Retry via bot
+    result = bot_client.api.send_message(chat_id: telegram_id, text: text_to_send)
+    source_type = 'bot'
+  end
+end
+```
+
+### Benefits
+
+- **Maintains channel context** (business stays business, bot stays bot)
+- **No manual channel selection needed** - automatic routing based on incoming message
+- **Seamless UX for customers** - response comes from same channel they used
+- **Single N8N workflow** handles both channels
+- **Fallback protection** - automatically switches to bot if business channel fails
+
+### Documentation
+
+- **Updated:** `ai_docs/development/n8n_integration.md` - New section "Channel Routing for Business API"
+- **Cross-reference:** `telegram_business_api.md` for Business API details
+- **Related:** `messenger_feature.md` for UI-based channel selection
+
+---
+
 ## [October 13, 2025] - Tab-Based Channel Selection UI
 
 ### Added
@@ -666,4 +781,4 @@ For questions, bug reports, or feature requests:
 
 ---
 
-**Last Updated:** October 13, 2025
+**Last Updated:** October 13, 2025 (N8N Business API Channel Routing)

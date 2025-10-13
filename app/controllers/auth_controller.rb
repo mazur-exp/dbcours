@@ -402,6 +402,8 @@ class AuthController < ApplicationController
         timestamp: message.created_at.iso8601,
         conversation_id: conversation.id,
         callback_url: callback_url,
+        source_type: message.source_type,  # bot or business
+        business_connection_id: message.business_connection_id,  # для business messages
         user: {
           id: user.id,
           telegram_id: user.telegram_id,
