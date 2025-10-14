@@ -30,6 +30,10 @@
 
 /public/assets
 
+# Ignore user avatars (downloaded from Telegram)
+/public/avatars/*
+!/public/avatars/.keep
+
 # Ignore master key for decrypting credentials and more.
 /config/master.key
 

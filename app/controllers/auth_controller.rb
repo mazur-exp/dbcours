@@ -625,8 +625,11 @@ class AuthController < ApplicationController
           file_info = bot_client.api.get_file(file_id: photo.file_id)
 
           if file_info && file_info.file_path
-            # Формируем URL для скачивания
-            return "https://api.telegram.org/file/bot#{TELEGRAM_BOT_TOKEN}/#{file_info.file_path}"
+            # Получаем временный URL из Telegram
+            telegram_url = "https://api.telegram.org/file/bot#{TELEGRAM_BOT_TOKEN}/#{file_info.file_path}"
+
+            # Скачиваем и сохраняем локально
+            return download_and_store_avatar(telegram_id, telegram_url)
           end
         end
       end
@@ -635,6 +638,39 @@ class AuthController < ApplicationController
     end
 
     nil # Возвращаем nil если не удалось получить аватарку
+  end
+
+  def download_and_store_avatar(telegram_id, telegram_url)
+    require 'open-uri'
+
+    begin
+      # Скачиваем изображение из Telegram
+      image_data = URI.open(telegram_url, read_timeout: 10).read
+
+      # Создаем папку если её нет
+      avatar_dir = Rails.root.join('public', 'avatars')
+      FileUtils.mkdir_p(avatar_dir) unless Dir.exist?(avatar_dir)
+
+      # Определяем расширение файла из URL
+      extension = telegram_url.match(/\.(jpg|jpeg|png|gif|webp)/i)&.captures&.first || 'jpg'
+      filename = "#{telegram_id}.#{extension}"
+      filepath = avatar_dir.join(filename)
+
+      # Сохраняем файл
+      File.write(filepath, image_data, mode: 'wb')
+
+      Rails.logger.info "✅ Avatar saved for user #{telegram_id}: /avatars/#{filename}"
+
+      # Возвращаем публичный URL
+      return "/avatars/#{filename}"
+
+    rescue OpenURI::HTTPError => e
+      Rails.logger.error "HTTP error downloading avatar for #{telegram_id}: #{e.message}"
+      return nil
+    rescue => e
+      Rails.logger.error "Failed to download and store avatar for #{telegram_id}: #{e.message}"
+      return nil
+    end
   end
 
   def cleanup_stale_session
