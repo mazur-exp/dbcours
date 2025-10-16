@@ -505,9 +505,60 @@ cable.subscriptions.create({
 - Session token for temporary auth flow (10 min expiry)
 - Browser session for logged-in state
 
-### Authorization (Future)
+### Authorization
 
-**Enrollment Check:**
+**Dashboard Access Control (Implemented 2025-10-16):**
+
+The application implements a flexible authorization pattern for paid content access that supports both admin users and paying customers.
+
+**Authorization Pattern:**
+```ruby
+# app/models/user.rb
+def has_dashboard_access?
+  admin? || paid?
+end
+```
+
+**Controller Implementation:**
+```ruby
+# app/controllers/dashboard_controller.rb
+before_action :require_dashboard_access
+
+private
+
+def require_dashboard_access
+  unless @current_user&.has_dashboard_access?
+    redirect_to freecontent_path, alert: "Доступ к курсу доступен только после оплаты"
+  end
+end
+```
+
+**User Model Fields:**
+- `admin` (boolean) - Administrative access flag
+- `paid` (boolean) - Paid user flag for content access
+- Callback: `after_save :ensure_admin_is_paid` - Automatically grants paid access to admins
+
+**Access Levels:**
+1. **Unauthenticated users:** No access to dashboard, redirected to `/freecontent`
+2. **Free authenticated users:** Access to free mini-course only (`/freecontent`)
+3. **Paid users:** Full dashboard access (`/dashboard`)
+4. **Admin users:** Full dashboard access + admin interfaces (`/messenger`, `/crm`)
+
+**Admin-Only Routes:**
+```ruby
+# app/controllers/crm_controller.rb
+before_action :require_admin
+
+private
+
+def require_admin
+  unless @current_user&.admin?
+    redirect_to root_path, alert: "Доступ запрещен"
+  end
+end
+```
+
+**Future Enrollment System (Planned):**
 ```ruby
 # app/controllers/paid_lessons_controller.rb
 before_action :require_enrollment

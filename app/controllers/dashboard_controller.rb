@@ -1,14 +1,11 @@
-require 'ostruct'
-
 class DashboardController < ApplicationController
+  before_action :require_dashboard_access
+
   def index
-    # Тестовые данные для визуализации
-    @user = OpenStruct.new(
-      name: "Иван Петров",
-      email: "ivan@example.com",
-      tier: "Акселератор",
-      enrolled_date: Date.new(2025, 9, 15)
-    )
+    # Используем реального пользователя
+    @user = @current_user
+    @enrolled_date = @user.created_at.to_date
+    @tier = @user.admin? ? "VIP (Admin)" : "Basic"
 
     @progress = {
       overall: 35,
@@ -93,5 +90,13 @@ class DashboardController < ApplicationController
       { name: "Чек-лист настройки.pdf", size: "890 KB", downloaded: true },
       { name: "Скрипты переговоров.docx", size: "156 KB", downloaded: false }
     ]
+  end
+
+  private
+
+  def require_dashboard_access
+    unless @current_user&.has_dashboard_access?
+      redirect_to freecontent_path, alert: "Доступ к курсу доступен только после оплаты"
+    end
   end
 end

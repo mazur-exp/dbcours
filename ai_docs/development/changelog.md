@@ -6,6 +6,146 @@ This document tracks all significant changes, features, and updates to the Bali 
 
 ---
 
+## [October 16, 2025] - Paid User Access Control & CRM Placeholder
+
+### Added
+
+- **Paid User Access Control System**
+  - Added `paid` boolean field to `users` table (default: false, null: false)
+  - Migration automatically sets `paid = true` for all existing admins
+  - New scope: `User.paid_users` for querying paid users
+  - New method: `User#has_dashboard_access?` - returns true for admin OR paid users
+  - Callback: `after_save :ensure_admin_is_paid` - automatically sets paid=true for admins
+  - **File:** `app/models/user.rb` (lines 9, 30-32, 36-41)
+  - **Migration:** `db/migrate/20251016095309_add_paid_to_users.rb`
+
+- **Dashboard Authorization**
+  - Dashboard now requires paid status OR admin status
+  - Added `before_action :require_dashboard_access` in DashboardController
+  - Redirects unpaid users to `/freecontent` with alert: "Доступ к курсу доступен только после оплаты"
+  - Removed mock data (OpenStruct), now uses real `@current_user`
+  - **File:** `app/controllers/dashboard_controller.rb` (lines 2, 95-101)
+
+- **CRM Placeholder Page**
+  - Created new route: `GET /crm`
+  - Created CrmController with admin-only access control
+  - Placeholder view following design system (green gradients, Tailwind CSS)
+  - Shows "В разработке" (In Development) message with planned features:
+    - Управление лидами из Telegram
+    - Автоматическая квалификация через AI
+    - Трекинг прогресса обучения
+    - Аналитика продаж и конверсий
+    - Интеграция с платежными системами
+  - **Files:**
+    - `config/routes.rb` - Added crm route
+    - `app/controllers/crm_controller.rb` - Admin authorization
+    - `app/views/crm/index.html.erb` - Placeholder UI
+
+### Changed
+
+- **Navigation Menu Reorganization**
+  - Updated dropdown menu order in `_auth_button.html.erb`:
+    1. Главная → `/` (Home)
+    2. Курс → `/dashboard` (Paid course - requires paid OR admin)
+    3. Мини-Курс → `/freecontent` (renamed from "Курс")
+    4. Messenger → `/messenger` (admin only)
+    5. CRM → `/crm` (admin only, NEW)
+    6. Выйти → logout
+  - **File:** `app/views/shared/_auth_button.html.erb` (lines 38-65)
+
+- **Dashboard Page Integration**
+  - Integrated `_auth_button` dropdown component into dashboard header
+  - Fixed sidebar logout button to use correct `auth_logout_path`
+  - Updated to use real user data instead of mock OpenStruct
+  - **File:** `app/views/dashboard/index.html.erb`
+
+### Technical Details
+
+**Database Schema Changes:**
+```ruby
+# Migration: AddPaidToUsers
+add_column :users, :paid, :boolean, default: false, null: false
+
+# Data migration: Set all existing admins to paid
+execute "UPDATE users SET paid = 1 WHERE admin = 1"
+```
+
+**User Model Updates:**
+```ruby
+# New scope
+scope :paid_users, -> { where(paid: true) }
+
+# New method
+def has_dashboard_access?
+  admin? || paid?
+end
+
+# New callback
+after_save :ensure_admin_is_paid
+
+private
+
+def ensure_admin_is_paid
+  if admin? && !paid?
+    update_column(:paid, true)
+  end
+end
+```
+
+**Authorization Pattern:**
+```ruby
+# DashboardController
+before_action :require_dashboard_access
+
+def require_dashboard_access
+  unless @current_user&.has_dashboard_access?
+    redirect_to freecontent_path, alert: "Доступ к курсу доступен только после оплаты"
+  end
+end
+
+# CrmController
+before_action :require_admin
+
+def require_admin
+  unless @current_user&.admin?
+    redirect_to root_path, alert: "Доступ запрещен"
+  end
+end
+```
+
+### Access Level Matrix
+
+| User Type | Free Mini-Course | Paid Dashboard | Messenger | CRM |
+|-----------|------------------|----------------|-----------|-----|
+| Not authenticated | ✗ | ✗ | ✗ | ✗ |
+| Authenticated (free) | ✓ | ✗ | ✗ | ✗ |
+| Authenticated (paid) | ✓ | ✓ | ✗ | ✗ |
+| Admin | ✓ | ✓ | ✓ | ✓ |
+
+### Documentation
+
+- **Updated:** `ai_docs/development/database_schema.md` - Added paid field documentation
+- **Updated:** `ai_docs/development/architecture.md` - Added authorization section
+- **Updated:** `ai_docs/ui/component_library.md` - Added CRM page and updated auth dropdown
+- **Updated:** `ai_docs/development/changelog.md` - This entry
+
+### Business Impact
+
+This update establishes the foundation for the freemium-to-paid conversion model:
+- Free users can access 12-lesson mini-course
+- Paid users unlock full dashboard (5 modules, 8 hours of content)
+- Admins maintain full access to all features
+- CRM placeholder signals upcoming sales management features
+
+### Future Enhancements
+
+- Payment integration (Stripe/YooKassa) to set `paid = true` on purchase
+- Enrollment tracking with tier selection (Basic/Accelerator/VIP)
+- CRM functionality for lead management and qualification
+- Analytics dashboard for admin revenue tracking
+
+---
+
 ## [October 13, 2025] - Business API Owner Message Filtering
 
 ### Fixed

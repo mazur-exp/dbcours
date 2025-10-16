@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_10_13_111309) do
+ActiveRecord::Schema[8.0].define(version: 2025_10_16_095309) do
   create_table "business_connections", force: :cascade do |t|
     t.string "business_connection_id", null: false
     t.integer "user_id", null: false
@@ -73,6 +73,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_13_111309) do
     t.datetime "updated_at", null: false
     t.boolean "admin", default: false, null: false
     t.string "avatar_url"
+    t.boolean "paid", default: false, null: false
     t.index ["session_token"], name: "index_users_on_session_token", unique: true
     t.index ["telegram_id"], name: "index_users_on_telegram_id", unique: true
   end

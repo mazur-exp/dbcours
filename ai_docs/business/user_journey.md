@@ -453,6 +453,50 @@ This document maps the complete user experience from first landing on the site t
 
 ## Journey Stage 5: Free Course Engagement (Authenticated)
 
+### Post-Authentication Access Levels
+
+**Updated:** 2025-10-16 - System now distinguishes between free and paid users
+
+**Access Control Matrix:**
+
+| User Status | `/freecontent` | `/dashboard` | `/messenger` | `/crm` |
+|-------------|----------------|--------------|--------------|--------|
+| Not authenticated | ✗ Redirected to auth | ✗ Redirected to auth | ✗ Redirected to auth | ✗ Redirected to auth |
+| Authenticated (free) | ✓ Full access | ✗ Redirected to `/freecontent` | ✗ Redirected to home | ✗ Redirected to home |
+| Authenticated (paid) | ✓ Full access | ✓ Full access | ✗ Redirected to home | ✗ Redirected to home |
+| Admin | ✓ Full access | ✓ Full access | ✓ Full access | ✓ Full access |
+
+**Navigation Menu Visibility:**
+
+Free authenticated users see:
+1. Главная → `/` (Home)
+2. Курс → `/dashboard` (Visible but redirects to `/freecontent` with alert)
+3. Мини-Курс → `/freecontent`
+4. Выйти → Logout
+
+Paid users see same menu, but `/dashboard` is accessible.
+
+Admin users additionally see:
+- Messenger → `/messenger`
+- CRM → `/crm`
+
+**Authorization Implementation:**
+```ruby
+# User model
+def has_dashboard_access?
+  admin? || paid?
+end
+
+# DashboardController
+before_action :require_dashboard_access
+
+def require_dashboard_access
+  unless @current_user&.has_dashboard_access?
+    redirect_to freecontent_path, alert: "Доступ к курсу доступен только после оплаты"
+  end
+end
+```
+
 ### Lesson Consumption Experience
 
 **Lesson Page Layout (Desktop):**
@@ -804,7 +848,64 @@ This document maps the complete user experience from first landing on the site t
 
 ---
 
-## Journey Stage 8: Community & Retention
+## Journey Stage 8: Admin Experience (CRM & Management)
+
+### CRM Placeholder (Added 2025-10-16)
+
+**Access:** Admin users only
+
+**Current Implementation:**
+- Route: `GET /crm`
+- Controller: `CrmController` with `before_action :require_admin`
+- View: Placeholder page showing "В разработке" (In Development)
+
+**Planned Features Display:**
+1. Управление лидами из Telegram (Lead management from Telegram)
+2. Автоматическая квалификация через AI (Automatic AI qualification)
+3. Трекинг прогресса обучения (Student progress tracking)
+4. Аналитика продаж и конверсий (Sales and conversion analytics)
+5. Интеграция с платежными системами (Payment system integration)
+
+**Visual Design:**
+- Green gradient hero: "🎯 CRM System"
+- Construction emoji: "🚧 В разработке"
+- Feature list in green-to-blue gradient card
+- Back button to home page
+
+**Purpose:**
+- Signals upcoming functionality to admin users
+- Sets expectations for CRM development roadmap
+- Maintains visual consistency with application design system
+
+**Future CRM Functionality:**
+
+**Lead Management Dashboard:**
+- View all Telegram conversations in one place
+- AI qualification scores displayed per user
+- Lead status pipeline: New → Qualified → Engaged → Converted
+- Filter by qualification score, status, date ranges
+
+**Student Analytics:**
+- Enrollment metrics: Conversions by tier (Basic/Accelerator/VIP)
+- Course progress tracking: Who completed which modules
+- Engagement metrics: Last active, messages sent, workshop attendance
+- Revenue dashboard: Total sales, average order value, refund rate
+
+**Payment Integration:**
+- View all transactions
+- Manual payment recording for offline purchases
+- Refund processing interface
+- Payment method statistics
+
+**Communication Tools:**
+- Bulk messaging to segments (e.g., "All free users who completed Lesson 8")
+- Email/Telegram campaign scheduling
+- Automated follow-up sequences
+- Template library for common messages
+
+---
+
+## Journey Stage 9: Community & Retention
 
 ### Community Platforms (Planned/Partial Implementation)
 
@@ -848,7 +949,7 @@ This document maps the complete user experience from first landing on the site t
 
 ---
 
-## Journey Stage 9: Advocacy & Referral
+## Journey Stage 10: Advocacy & Referral
 
 ### Creating Advocates
 

@@ -167,68 +167,132 @@ This document catalogs all reusable UI components in the Bali Food Delivery Mast
 
 ## Authentication Components
 
-### Auth Button (Dynamic Server-Rendered)
+### Auth Button with Dropdown Menu (Dynamic Server-Rendered)
 
 **Location:** `app/views/shared/_auth_button.html.erb`
+
+**Updated:** 2025-10-16 - Changed from inline buttons to dropdown menu structure
 
 **Non-Authenticated State:**
 ```html
 <button
   id="auth-button"
   data-authenticated="false"
-  data-controller="auth"
-  data-action="click->auth#startAuth"
-  class="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200"
+  class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded-lg transition-all shadow-md hover:shadow-lg"
 >
-  <svg class="w-5 h-5" aria-hidden="true">
-    <!-- Checkmark icon -->
-  </svg>
-  <span>Авторизация</span>
+  <span class="flex items-center gap-2">
+    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+      <!-- Checkmark icon -->
+    </svg>
+    Авторизация
+  </span>
 </button>
 ```
 
-**Authenticated State:**
+**Authenticated State (Dropdown Menu):**
 ```html
-<div class="flex items-center gap-3">
-  <!-- User Info Button -->
+<div class="relative" data-authenticated="true" data-controller="dropdown">
+  <!-- Trigger Button -->
   <button
-    id="auth-button"
-    data-authenticated="true"
-    class="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+    data-action="click->dropdown#toggle"
+    class="bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-1.5 px-3 rounded-lg transition-all flex items-center gap-2 text-sm"
   >
-    <svg class="w-5 h-5" aria-hidden="true">
-      <!-- User icon -->
-    </svg>
+    <!-- Avatar -->
+    <div class="w-7 h-7 rounded-full bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center text-white text-xs font-bold">
+      JD <!-- User initials -->
+    </div>
     <span>John</span> <!-- User's first_name -->
+    <svg class="w-3.5 h-3.5 transition-transform text-gray-500" data-dropdown-target="chevron">
+      <!-- Chevron down icon -->
+    </svg>
   </button>
 
-  <!-- Logout Button -->
-  <form action="/auth/logout" method="post" data-turbo="false">
-    <button
-      type="submit"
-      class="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-3 rounded-lg transition-colors duration-200"
-    >
-      <span>Logout</span>
-    </button>
-  </form>
+  <!-- Dropdown Menu -->
+  <div data-dropdown-target="menu" class="hidden absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden z-50">
+    <!-- Profile Header -->
+    <div class="px-4 py-3 bg-gradient-to-r from-blue-50 to-blue-100 border-b border-blue-200">
+      <div class="flex items-center gap-3">
+        <!-- Avatar (larger) -->
+        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center text-white text-sm font-bold">
+          JD
+        </div>
+        <div>
+          <div class="font-bold text-gray-900">John Doe</div>
+          <div class="text-sm text-gray-600">@johndoe</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Menu Items -->
+    <div class="py-2">
+      <a href="/" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-100 transition-colors text-gray-700">
+        <svg class="w-5 h-5 text-gray-500"><!-- Home icon --></svg>
+        <span>Главная</span>
+      </a>
+
+      <a href="/dashboard" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-100 transition-colors text-gray-700">
+        <svg class="w-5 h-5 text-gray-500"><!-- Book icon --></svg>
+        <span>Курс</span>
+      </a>
+
+      <a href="/freecontent" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-100 transition-colors text-gray-700">
+        <svg class="w-5 h-5 text-gray-500"><!-- Book icon --></svg>
+        <span>Мини-Курс</span>
+      </a>
+
+      <!-- Admin-Only Links -->
+      <% if @current_user.admin? %>
+        <a href="/messenger" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-100 transition-colors text-gray-700">
+          <svg class="w-5 h-5 text-gray-500"><!-- Message icon --></svg>
+          <span>Messenger</span>
+        </a>
+
+        <a href="/crm" class="flex items-center gap-3 px-4 py-3 hover:bg-gray-100 transition-colors text-gray-700">
+          <svg class="w-5 h-5 text-gray-500"><!-- Chart icon --></svg>
+          <span>CRM</span>
+        </a>
+      <% end %>
+
+      <div class="border-t border-gray-200 my-2"></div>
+
+      <!-- Logout -->
+      <form action="/auth/logout" method="delete" data-turbo="false">
+        <button type="submit" class="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 transition-colors text-red-600">
+          <svg class="w-5 h-5"><!-- Logout icon --></svg>
+          <span>Выйти</span>
+        </button>
+      </form>
+    </div>
+  </div>
 </div>
 ```
 
-**Visual States:**
-- **Not authenticated:** Green background, "Авторизация" text
-- **Authenticated:** Blue background, shows first name, + red logout button
-- **Hover:** Darker shade of current color
+**Menu Order (as of 2025-10-16):**
+1. Главная → `/` (Home)
+2. Курс → `/dashboard` (Paid course - requires paid OR admin)
+3. Мини-Курс → `/freecontent` (Free mini-course)
+4. Messenger → `/messenger` (Admin only)
+5. CRM → `/crm` (Admin only)
+6. Выйти → Logout
 
-**Data Attributes:**
-- `data-authenticated="true|false"` - JavaScript uses to check auth state
-- `data-controller="auth"` - Stimulus controller attachment (non-authenticated only)
+**Visual States:**
+- **Not authenticated:** Green button with "Авторизация" text
+- **Authenticated:** Gray button showing avatar + first name + chevron
+- **Dropdown open:** Menu slides down, chevron rotates
+- **Menu item hover:** Gray background on hover
+
+**JavaScript Controller:**
+- Uses Stimulus `dropdown` controller
+- Toggle dropdown on button click
+- Close dropdown when clicking outside (body click listener)
+- Chevron rotation animation
 
 **Rendering Logic (Server):**
 ```erb
 <% if @current_user %>
-  <!-- Authenticated state -->
+  <!-- Dropdown menu with conditional admin links -->
 <% else %>
-  <!-- Non-authenticated state -->
+  <!-- Simple auth button -->
 <% end %>
 ```
 
@@ -782,6 +846,94 @@ document.getElementById('auth-modal').classList.add('hidden');
   </div>
 </div>
 ```
+
+---
+
+## Admin Pages
+
+### CRM Placeholder Page
+
+**Location:** `app/views/crm/index.html.erb`
+
+**Added:** 2025-10-16 - Placeholder page for future CRM functionality
+
+**Access Control:** Admin only (`before_action :require_admin`)
+
+**Layout Structure:**
+```html
+<div class="min-h-screen bg-gray-50">
+  <!-- Top Navigation -->
+  <nav class="bg-white shadow-sm border-b border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16">
+        <div class="flex items-center">
+          <a href="/" class="text-xl md:text-2xl font-bold text-green-600">
+            <span class="hidden sm:inline">📚 Bali Food Delivery Master</span>
+            <span class="sm:hidden">📚 BFDM</span>
+          </a>
+        </div>
+        <div class="flex items-center gap-4">
+          <%= render 'shared/auth_button' %>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Hero Section -->
+    <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-xl shadow-lg p-8 text-white mb-8">
+      <div class="flex items-center gap-4 mb-4">
+        <span class="text-5xl">🎯</span>
+        <div>
+          <h1 class="text-3xl sm:text-4xl font-bold">CRM System</h1>
+          <p class="text-green-100 text-lg mt-2">Управление клиентами и продажами</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Coming Soon Card -->
+    <div class="bg-white rounded-xl shadow-lg p-8 text-center">
+      <span class="text-6xl mb-6 block">🚧</span>
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">В разработке</h2>
+      <p class="text-gray-600 mb-6 leading-relaxed">
+        CRM система находится в процессе разработки...
+      </p>
+
+      <!-- Planned Features -->
+      <div class="bg-gradient-to-br from-green-50 to-blue-50 rounded-lg p-6 border border-green-200 mb-6">
+        <h3 class="text-lg font-bold text-gray-900 mb-4">💡 Планируемый функционал</h3>
+        <ul class="space-y-3 text-left max-w-lg mx-auto">
+          <li>✓ Управление лидами из Telegram</li>
+          <li>✓ Автоматическая квалификация через AI</li>
+          <li>✓ Трекинг прогресса обучения</li>
+          <li>✓ Аналитика продаж и конверсий</li>
+          <li>✓ Интеграция с платежными системами</li>
+        </ul>
+      </div>
+
+      <!-- Back Button -->
+      <a href="/" class="inline-flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-lg">
+        <svg class="w-5 h-5"><!-- Left arrow --></svg>
+        <span>Вернуться на главную</span>
+      </a>
+    </div>
+  </div>
+</div>
+```
+
+**Design System Alignment:**
+- Uses standard green gradient for hero (`from-green-500 to-green-600`)
+- Follows card design pattern with rounded corners and shadows
+- Responsive layout with Tailwind breakpoints
+- Integrates auth button dropdown component
+
+**Future Implementation:**
+- Lead management dashboard
+- AI qualification display
+- Sales analytics charts
+- Payment integration status
+- Student progress tracking
 
 ---
 

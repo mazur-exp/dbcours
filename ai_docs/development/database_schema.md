@@ -41,8 +41,9 @@ end
 | `last_name` | string | YES | NULL | User's last name from Telegram (may be null) |
 | `session_token` | string | YES | NULL | Temporary token for auth flow (32-char hex) |
 | `authenticated` | boolean | NO | false | Whether user has completed auth |
-| `admin` | boolean | NO | false | **NEW:** Admin flag for messenger access |
-| `avatar_url` | string | YES | NULL | **NEW:** Telegram profile photo URL |
+| `admin` | boolean | NO | false | Admin flag for messenger access |
+| `avatar_url` | string | YES | NULL | Telegram profile photo URL |
+| `paid` | boolean | NO | false | **NEW:** Paid user flag for dashboard access |
 | `created_at` | datetime | NO | now() | Record creation timestamp |
 | `updated_at` | datetime | NO | now() | Record last update timestamp |
 
@@ -54,10 +55,10 @@ end
 - `telegram_id` must be unique and not null
 - `session_token` must be unique if present
 
-**New Fields (Added 2025-10-08):**
+**Admin and Avatar Fields (Added 2025-10-08):**
 
 - **`admin`** - Boolean flag for admin dashboard access
-  - Purpose: Controls access to `/messenger` admin interface
+  - Purpose: Controls access to `/messenger` and `/crm` admin interfaces
   - Usage: `@current_user.admin?` in controllers
   - Set manually in console: `user.update(admin: true)`
 
@@ -67,6 +68,23 @@ end
   - Fetched from Telegram API during auth
   - Updated periodically (daily) for active users
   - Fallback: Show initials if avatar_url is nil
+
+**Paid Access Control (Added 2025-10-16):**
+
+- **`paid`** - Boolean flag for paid course access
+  - Purpose: Controls access to premium content on `/dashboard` route
+  - Default: `false` for new users
+  - Automatically set to `true` for all admin users (via callback)
+  - Usage: `@current_user.paid?` or `@current_user.has_dashboard_access?` in controllers
+  - Authorization pattern:
+    ```ruby
+    # Dashboard requires EITHER admin OR paid status
+    def has_dashboard_access?
+      admin? || paid?
+    end
+    ```
+  - Migration: Existing admins automatically marked as paid via data migration
+  - Business logic: Admins always have paid=true (enforced by `after_save` callback)
 
 ---
 
@@ -86,6 +104,7 @@ end
 ```ruby
 scope :admins, -> { where(admin: true) }
 scope :authenticated_users, -> { where(authenticated: true) }
+scope :paid_users, -> { where(paid: true) }
 ```
 
 **Methods:**
@@ -103,6 +122,25 @@ end
 # Count of sent messages
 def messages_count
   conversation&.messages&.where(direction: :incoming)&.count || 0
+end
+
+# Check if user has access to paid dashboard content
+def has_dashboard_access?
+  admin? || paid?
+end
+```
+
+**Callbacks:**
+```ruby
+after_save :ensure_admin_is_paid
+
+private
+
+# Automatically sets paid = true for admins
+def ensure_admin_is_paid
+  if admin? && !paid?
+    update_column(:paid, true)
+  end
 end
 ```
 
