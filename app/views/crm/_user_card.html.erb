@@ -1,0 +1,95 @@
+<%
+  # Цвет бейджа для ai_ready_score
+  score_colors = {
+    (8..10) => 'bg-red-500 text-white',
+    (6..7) => 'bg-orange-500 text-white',
+    (4..5) => 'bg-yellow-500 text-white',
+    (1..3) => 'bg-blue-500 text-white'
+  }
+
+  score = user.ready_score
+  score_color = score ? (score_colors.find { |range, _| range.include?(score) }&.last || 'bg-gray-400 text-white') : 'bg-gray-400 text-white'
+%>
+
+<div id="user_card_<%= user.id %>"
+     class="kanban-card bg-white rounded-lg shadow-sm hover:shadow-lg transition-all duration-200 border border-gray-200 p-3 active:opacity-50 active:shadow-2xl select-none cursor-grab hover:cursor-pointer"
+     data-kanban-target="card"
+     data-user-id="<%= user.id %>"
+     data-conversation-id="<%= user.conversation&.id %>"
+     data-ready-score="<%= user.ready_score || 0 %>"
+     data-position="<%= user.crm_position || 999 %>"
+     draggable="true"
+     data-action="dragstart->kanban#handleDragStart dragend->kanban#handleDragEnd click->kanban#openMessenger">
+
+  <!-- Заголовок карточки -->
+  <div class="flex items-start gap-3 mb-3">
+    <!-- Аватар -->
+    <div class="flex-shrink-0">
+      <%= user_avatar(user, 'rounded-full', 'w-10 h-10') %>
+    </div>
+
+    <!-- Имя и инфо -->
+    <div class="flex-1 min-w-0">
+      <h4 class="font-semibold text-gray-900 text-sm truncate">
+        <%= user.full_name %>
+      </h4>
+      <% if user.username %>
+        <p class="text-xs text-gray-500 truncate">@<%= user.username %></p>
+      <% end %>
+    </div>
+
+    <!-- Температура лида -->
+    <div class="flex-shrink-0 text-xl" title="<%= user.lead_temperature %>">
+      <%= user.temperature_emoji %>
+    </div>
+  </div>
+
+  <!-- Метрики -->
+  <div class="grid grid-cols-2 gap-2 mb-3">
+    <!-- AI Ready Score -->
+    <div class="flex items-center gap-1">
+      <span class="text-xs text-gray-500">Score:</span>
+      <% if score %>
+        <span class="<%= score_color %> text-xs font-bold px-2 py-0.5 rounded-full">
+          <%= score %>/10
+        </span>
+      <% else %>
+        <span class="text-xs text-gray-400">—</span>
+      <% end %>
+    </div>
+
+    <!-- Сообщения -->
+    <div class="flex items-center gap-1">
+      <span class="text-xs text-gray-500">💬</span>
+      <span class="text-xs font-semibold text-gray-700">
+        <%= user.messages_count %>
+      </span>
+    </div>
+  </div>
+
+  <!-- Дополнительная информация -->
+  <div class="border-t border-gray-100 pt-2 space-y-1">
+    <% if user.conversation&.ai_real_name.present? %>
+      <div class="flex items-center gap-1 text-xs">
+        <span class="text-gray-500">Имя:</span>
+        <span class="font-medium text-gray-700 truncate"><%= user.conversation.ai_real_name %></span>
+      </div>
+    <% end %>
+
+    <% if user.conversation&.last_message_at %>
+      <div class="flex items-center gap-1 text-xs text-gray-500">
+        <span>🕐</span>
+        <span><%= time_ago_in_words(user.conversation.last_message_at) %> назад</span>
+      </div>
+    <% end %>
+
+    <% if user.paid? %>
+      <div class="flex items-center gap-1 text-xs">
+        <span class="bg-green-100 text-green-800 font-semibold px-2 py-0.5 rounded-full">
+          💰 Оплачено
+        </span>
+      </div>
+    <% end %>
+  </div>
+
+</div>

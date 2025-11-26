@@ -26,8 +26,9 @@ Rails.application.routes.draw do
   # Business Connections (Admin only)
   get "messenger/business_connections", to: "business_connections#index", as: :messenger_business_connections
 
-  # CRM route (Admin only)
+  # CRM routes (Admin only)
   get "crm", to: "crm#index", as: :crm
+  patch "crm/users/:id/update_status", to: "crm#update_status", as: :crm_update_user_status
 
   # Free content routes
   get "freecontent", to: "free_lessons#index", as: :freecontent

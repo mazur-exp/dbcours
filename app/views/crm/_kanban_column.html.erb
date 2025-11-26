@@ -1,0 +1,55 @@
+<%
+  # Определяем цвет колонки в зависимости от статуса
+  column_colors = {
+    'new_lead' => 'bg-gray-50 border-gray-300',
+    'contacted' => 'bg-blue-50 border-blue-300',
+    'qualified' => 'bg-purple-50 border-purple-300',
+    'interested' => 'bg-yellow-50 border-yellow-300',
+    'payment_pending' => 'bg-orange-50 border-orange-300',
+    'paid_status' => 'bg-green-50 border-green-300',
+    'inactive' => 'bg-red-50 border-red-300'
+  }
+
+  column_header_colors = {
+    'new_lead' => 'text-gray-700',
+    'contacted' => 'text-blue-700',
+    'qualified' => 'text-purple-700',
+    'interested' => 'text-yellow-700',
+    'payment_pending' => 'text-orange-700',
+    'paid_status' => 'text-green-700',
+    'inactive' => 'text-red-700'
+  }
+
+  status_labels = {
+    'new_lead' => '🆕 Новый лид',
+    'contacted' => '📞 Связались',
+    'qualified' => '✅ Квалифицирован',
+    'interested' => '💎 Интересуется',
+    'payment_pending' => '⏳ Ожидает оплату',
+    'paid_status' => '💰 Оплатил',
+    'inactive' => '😴 Неактивен'
+  }
+%>
+
+<div class="flex-shrink-0 w-72" data-column-wrapper>
+  <!-- Заголовок колонки -->
+  <div class="<%= column_colors[status] %> rounded-t-lg border-t-4 px-4 py-3 bg-white">
+    <div class="flex items-center justify-between">
+      <h3 class="font-bold <%= column_header_colors[status] %> text-sm">
+        <%= status_labels[status] %>
+      </h3>
+      <span class="<%= column_header_colors[status] %> font-semibold text-sm px-2 py-1 rounded-full bg-gray-100 shadow-sm" data-column-count>
+        <%= users&.length || 0 %>
+      </span>
+    </div>
+  </div>
+
+  <!-- Список карточек -->
+  <div class="kanban-column <%= column_colors[status] %> border-x border-b rounded-b-lg p-4 pt-6 min-h-[500px] max-h-[calc(100vh-200px)] overflow-y-auto space-y-4 transition-colors"
+       data-kanban-target="column"
+       data-status="<%= status %>">
+    <% users&.each do |user| %>
+      <%= render 'crm/user_card', user: user %>
+    <% end %>
+  </div>
+</div>

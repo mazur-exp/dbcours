@@ -23,6 +23,7 @@ class Message < ApplicationRecord
   # Callbacks
   after_create :update_conversation_timestamp
   after_create :increment_conversation_unread, if: :incoming?
+  after_create :update_crm_status, if: :from_user?
 
   # Проверка является ли сообщение от админа
   def from_admin?
@@ -42,5 +43,33 @@ class Message < ApplicationRecord
 
   def increment_conversation_unread
     conversation.increment_unread!
+  end
+
+  def update_crm_status
+    return unless user
+
+    # Первое сообщение от пользователя: new_lead -> contacted
+    if user.new_lead? && user.messages.where(direction: :incoming).count == 1
+      user.contacted!
+      broadcast_crm_update(user)
+    end
+  end
+
+  def broadcast_crm_update(user)
+    ActionCable.server.broadcast("crm_channel", {
+      type: "card_updated",
+      user_id: user.id,
+      user: {
+        id: user.id,
+        full_name: user.full_name,
+        avatar_url: user.avatar_url,
+        crm_status: user.crm_status,
+        crm_position: user.crm_position,
+        ready_score: user.ready_score,
+        temperature: user.lead_temperature.to_s,
+        temperature_emoji: user.temperature_emoji,
+        messages_count: user.messages_count
+      }
+    })
   end
 end
