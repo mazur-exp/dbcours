@@ -1,0 +1,25 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  name: MyString
+  utm_source: MyString
+  utm_medium: MyString
+  utm_campaign: MyString
+  short_code: MyString
+  link_type: 1
+  target_url: MyString
+  clicks_count: 1
+  leads_count: 1
+  conversions_count: 1
+
+two:
+  name: MyString
+  utm_source: MyString
+  utm_medium: MyString
+  utm_campaign: MyString
+  short_code: MyString
+  link_type: 1
+  target_url: MyString
+  clicks_count: 1
+  leads_count: 1
+  conversions_count: 1

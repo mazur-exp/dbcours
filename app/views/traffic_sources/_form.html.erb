@@ -1,0 +1,74 @@
+<%= form_with(model: traffic_source, class: "space-y-6") do |form| %>
+  <% if traffic_source.errors.any? %>
+    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+      <h3 class="text-red-800 font-semibold">Ошибки:</h3>
+      <ul class="mt-2 text-sm text-red-700 list-disc list-inside">
+        <% traffic_source.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="bg-white rounded-lg shadow p-6 space-y-6">
+    <!-- Название -->
+    <div>
+      <%= form.label :name, "Название источника", class: "block text-sm font-medium text-gray-700 mb-2" %>
+      <%= form.text_field :name, placeholder: "YouTube видео #1", class: "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent" %>
+    </div>
+
+    <!-- Тип ссылки -->
+    <div>
+      <%= form.label :link_type, "Тип ссылки", class: "block text-sm font-medium text-gray-700 mb-2" %>
+      <%= form.select :link_type, [['🌐 Ссылка на сайт', 'site'], ['🤖 Ссылка на бот', 'bot']], {}, class: "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" %>
+    </div>
+
+    <!-- UTM параметры -->
+    <div class="border-t pt-6">
+      <h3 class="text-lg font-semibold text-gray-900 mb-4">UTM параметры</h3>
+
+      <div class="space-y-4">
+        <div>
+          <%= form.label :utm_source, "UTM Source (обязательно)", class: "block text-sm font-medium text-gray-700 mb-2" %>
+          <%= form.text_field :utm_source, placeholder: "youtube", class: "w-full px-4 py-2 border border-gray-300 rounded-lg" %>
+        </div>
+
+        <div>
+          <%= form.label :utm_medium, "UTM Medium", class: "block text-sm font-medium text-gray-700 mb-2" %>
+          <%= form.text_field :utm_medium, placeholder: "video", class: "w-full px-4 py-2 border border-gray-300 rounded-lg" %>
+        </div>
+
+        <div>
+          <%= form.label :utm_campaign, "UTM Campaign", class: "block text-sm font-medium text-gray-700 mb-2" %>
+          <%= form.text_field :utm_campaign, placeholder: "promo_january", class: "w-full px-4 py-2 border border-gray-300 rounded-lg" %>
+        </div>
+      </div>
+    </div>
+
+    <!-- Целевой URL (опционально для сайта) -->
+    <div>
+      <%= form.label :target_url, "Целевой URL (опционально)", class: "block text-sm font-medium text-gray-700 mb-2" %>
+      <%= form.text_field :target_url, placeholder: "https://crm.aidelivery.tech", class: "w-full px-4 py-2 border border-gray-300 rounded-lg" %>
+      <p class="mt-1 text-xs text-gray-500">Если пусто - редирект на главную страницу</p>
+    </div>
+
+    <!-- Предпросмотр -->
+    <% if traffic_source.persisted? %>
+      <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+        <h4 class="font-semibold text-green-900 mb-2">Короткая ссылка:</h4>
+        <div class="flex items-center gap-2">
+          <code class="flex-1 bg-white px-3 py-2 rounded border text-sm"><%= traffic_source.short_url %></code>
+          <button type="button" onclick="navigator.clipboard.writeText('<%= traffic_source.short_url %>')" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded">
+            📋 Копировать
+          </button>
+        </div>
+      </div>
+    <% end %>
+
+    <!-- Кнопки -->
+    <div class="flex items-center gap-4">
+      <%= form.submit traffic_source.persisted? ? "Сохранить" : "Создать источник", class: "bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors" %>
+      <%= link_to "Отмена", traffic_sources_path, class: "text-gray-600 hover:text-gray-900" %>
+    </div>
+  </div>
+<% end %>

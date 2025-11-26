@@ -30,6 +30,12 @@ Rails.application.routes.draw do
   get "crm", to: "crm#index", as: :crm
   patch "crm/users/:id/update_status", to: "crm#update_status", as: :crm_update_user_status
 
+  # Traffic Sources routes (Admin only)
+  resources :traffic_sources
+
+  # Short links redirect
+  get "s/:code", to: "short_links#redirect", as: :short_link
+
   # Free content routes
   get "freecontent", to: "free_lessons#index", as: :freecontent
   get "freecontent/:id", to: "free_lessons#show", as: :freecontent_lesson

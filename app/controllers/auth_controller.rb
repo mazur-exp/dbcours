@@ -154,6 +154,9 @@ class AuthController < ApplicationController
         authenticated: true
       )
 
+      # Привязываем UTM из session (если есть)
+      attach_utm_to_user(user, session_token)
+
       # Получаем и сохраняем аватарку (с повторной попыткой при неудаче)
       avatar_url = fetch_user_avatar(from["id"])
       # Если не получили с первого раза - попробуем ещё раз через 1 секунду
@@ -681,6 +684,24 @@ class AuthController < ApplicationController
         session.delete(:auth_started_at)
         session.delete(:user_id)
         Rails.logger.info "Cleaned up stale session"
+      end
+    end
+  end
+
+  def attach_utm_to_user(user, session_token)
+    # Получаем UTM из Redis/session store (нужно найти session по токену)
+    # Пока сохраняем просто в utm_params как JSON
+    # TODO: Реализовать получение session по session_token
+
+    # Временное решение: проверяем referral код в session_token
+    # Если session_token начинается с ref_, это реферальная ссылка
+    if session_token.start_with?('ref_')
+      short_code = session_token.sub('ref_', '')
+      source = TrafficSource.find_by(short_code: short_code)
+      if source && user.traffic_source_id.nil?
+        user.traffic_source_id = source.id
+        user.utm_params = { short_code: short_code }.to_json
+        Rails.logger.info "Attached traffic source #{source.name} to user #{user.telegram_id}"
       end
     end
   end

@@ -2,8 +2,8 @@ class CrmController < ApplicationController
   before_action :require_admin
 
   def index
-    # Загружаем всех пользователей с их conversations (eager loading)
-    @users = User.includes(:conversations).all
+    # Загружаем всех пользователей с их conversations и traffic_source (eager loading)
+    @users = User.includes(:conversations, :traffic_source).all
 
     # Группируем по статусам для канбан-доски
     @users_by_status = User.crm_statuses.keys.index_with do |status|

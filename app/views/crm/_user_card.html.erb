@@ -69,6 +69,15 @@
 
   <!-- Дополнительная информация -->
   <div class="border-t border-gray-100 pt-2 space-y-1">
+    <% if user.traffic_source %>
+      <div class="flex items-center gap-1 text-xs">
+        <span class="text-gray-500">Источник:</span>
+        <span class="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full font-semibold truncate">
+          <%= user.traffic_source.site? ? '🌐' : '🤖' %> <%= user.traffic_source.name %>
+        </span>
+      </div>
+    <% end %>
+
     <% if user.conversation&.ai_real_name.present? %>
       <div class="flex items-center gap-1 text-xs">
         <span class="text-gray-500">Имя:</span>

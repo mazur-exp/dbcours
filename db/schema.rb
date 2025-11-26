@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_11_26_031311) do
+ActiveRecord::Schema[8.0].define(version: 2025_11_26_092052) do
   create_table "business_connections", force: :cascade do |t|
     t.string "business_connection_id", null: false
     t.integer "user_id", null: false
@@ -62,6 +62,34 @@ ActiveRecord::Schema[8.0].define(version: 2025_11_26_031311) do
     t.index ["user_id"], name: "index_messages_on_user_id"
   end
 
+  create_table "traffic_clicks", force: :cascade do |t|
+    t.integer "traffic_source_id", null: false
+    t.integer "user_id", null: false
+    t.string "ip_address"
+    t.string "user_agent"
+    t.datetime "clicked_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["traffic_source_id"], name: "index_traffic_clicks_on_traffic_source_id"
+    t.index ["user_id"], name: "index_traffic_clicks_on_user_id"
+  end
+
+  create_table "traffic_sources", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "utm_source", null: false
+    t.string "utm_medium"
+    t.string "utm_campaign"
+    t.string "short_code", null: false
+    t.integer "link_type", default: 0, null: false
+    t.string "target_url"
+    t.integer "clicks_count", default: 0, null: false
+    t.integer "leads_count", default: 0, null: false
+    t.integer "conversions_count", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["short_code"], name: "index_traffic_sources_on_short_code", unique: true
+  end
+
   create_table "users", force: :cascade do |t|
     t.bigint "telegram_id", null: false
     t.string "username"
@@ -76,14 +104,20 @@ ActiveRecord::Schema[8.0].define(version: 2025_11_26_031311) do
     t.boolean "paid", default: false, null: false
     t.integer "crm_status", default: 0, null: false
     t.integer "crm_position"
+    t.integer "traffic_source_id"
+    t.text "utm_params"
     t.index ["crm_status", "crm_position"], name: "index_users_on_crm_status_and_crm_position"
     t.index ["crm_status"], name: "index_users_on_crm_status"
     t.index ["session_token"], name: "index_users_on_session_token", unique: true
     t.index ["telegram_id"], name: "index_users_on_telegram_id", unique: true
+    t.index ["traffic_source_id"], name: "index_users_on_traffic_source_id"
   end
 
   add_foreign_key "business_connections", "users"
   add_foreign_key "conversations", "users"
   add_foreign_key "messages", "conversations"
   add_foreign_key "messages", "users"
+  add_foreign_key "traffic_clicks", "traffic_sources"
+  add_foreign_key "traffic_clicks", "users"
+  add_foreign_key "users", "traffic_sources"
 end

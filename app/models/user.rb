@@ -2,6 +2,8 @@ class User < ApplicationRecord
   has_many :conversations, dependent: :destroy
   has_many :messages
   has_many :business_connections, dependent: :destroy
+  belongs_to :traffic_source, optional: true
+  has_many :traffic_clicks, dependent: :destroy
 
   # Enums
   enum :crm_status, {
@@ -26,6 +28,8 @@ class User < ApplicationRecord
   # Callbacks
   after_save :ensure_admin_is_paid
   after_update :update_crm_on_payment, if: :paid_changed?
+  after_create :increment_source_leads
+  after_update :increment_source_conversions, if: :saved_change_to_paid?
 
   # Получить или создать беседу для этого пользователя
   def conversation
@@ -140,5 +144,15 @@ class User < ApplicationRecord
         messages_count: messages_count
       }
     })
+  end
+
+  def increment_source_leads
+    traffic_source&.increment!(:leads_count)
+  end
+
+  def increment_source_conversions
+    if paid? && traffic_source
+      traffic_source.increment!(:conversions_count)
+    end
   end
 end
