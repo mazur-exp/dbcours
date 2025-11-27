@@ -10,7 +10,10 @@ servers:
     hosts:
       - 46.62.195.19
     labels:
-      traefik.http.routers.dbcours.rule: "Host(`course.aidelivery.tech`) || Host(`crm.aidelivery.tech`)"
+      traefik.http.routers.dbcours-web.rule: "Host(`course.aidelivery.tech`) || Host(`crm.aidelivery.tech`)"
+      traefik.http.routers.dbcours-web-secure.rule: "Host(`course.aidelivery.tech`) || Host(`crm.aidelivery.tech`)"
+      traefik.http.routers.dbcours-web-secure.tls: "true"
+      traefik.http.routers.dbcours-web-secure.tls.certresolver: "letsencrypt"
   job:
     hosts:
       - 46.62.195.19
