@@ -1,4 +1,4 @@
-require_relative '../lib/constraints/domain_constraint'
+require_relative '../lib/domain_constraint'
 
 Rails.application.routes.draw do
   # Health check и PWA доступны на всех доменах
