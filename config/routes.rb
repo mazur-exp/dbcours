@@ -30,8 +30,8 @@ Rails.application.routes.draw do
   # CRM DOMAIN - crm.aidelivery.tech
   # ========================================
   constraints(DomainConstraint.new('crm')) do
-    # Root для CRM - сразу показываем CRM канбан
-    root "crm#index"
+    # Root для CRM - welcome page с авторизацией
+    root "crm_home#index"
 
     # CRM routes (Admin only)
     get "crm", to: "crm#index", as: :crm
@@ -71,7 +71,7 @@ Rails.application.routes.draw do
     end
 
     scope '/crm', defaults: { domain: 'crm' } do
-      get "/", to: "crm#index", as: :dev_crm_root
+      get "/", to: "crm_home#index", as: :dev_crm_root
       get "crm", to: "crm#index", as: :dev_crm
       get "messenger", to: "messenger#index", as: :dev_messenger
       resources :traffic_sources, as: :dev_traffic_sources
