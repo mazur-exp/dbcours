@@ -78,6 +78,6 @@ Rails.application.routes.draw do
     end
 
     # По умолчанию в development редиректим на /course
-    root to: redirect('/course')
+    root to: redirect('/course'), as: :dev_root
   end
 end
