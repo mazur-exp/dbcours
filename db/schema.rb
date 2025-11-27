@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_11_26_092052) do
+ActiveRecord::Schema[8.0].define(version: 2025_11_26_105503) do
   create_table "business_connections", force: :cascade do |t|
     t.string "business_connection_id", null: false
     t.integer "user_id", null: false
@@ -64,7 +64,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_11_26_092052) do
 
   create_table "traffic_clicks", force: :cascade do |t|
     t.integer "traffic_source_id", null: false
-    t.integer "user_id", null: false
+    t.integer "user_id"
     t.string "ip_address"
     t.string "user_agent"
     t.datetime "clicked_at"
@@ -87,6 +87,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_11_26_092052) do
     t.integer "conversions_count", default: 0, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "product", default: 0, null: false
     t.index ["short_code"], name: "index_traffic_sources_on_short_code", unique: true
   end
 

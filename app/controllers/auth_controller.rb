@@ -116,24 +116,143 @@ class AuthController < ApplicationController
     text = message["text"]
     from = message["from"]
 
-    # Извлекаем session_token из команды /start session_token
-    session_token = text.split(" ")[1]
+    # Извлекаем payload из команды /start payload
+    payload = text.split(" ")[1]
 
-    Rails.logger.info "Handle start command: chat_id=#{chat_id}, session_token=#{session_token}"
+    Rails.logger.info "Handle start command: chat_id=#{chat_id}, payload=#{payload}"
 
-    if session_token.present?
-      # Отправляем сообщение с кнопкой авторизации
-      Rails.logger.info "Sending auth message to chat_id=#{chat_id}"
-      result = send_auth_message(chat_id, session_token, from)
-      Rails.logger.info "Auth message sent result: #{result.inspect}"
-    else
-      # Если токен не передан - просто приветствие
-      Rails.logger.info "Sending welcome message to chat_id=#{chat_id}"
+    if payload.blank?
+      # Пустой /start → обычное приветствие
+      Rails.logger.info "Empty payload - sending welcome message"
       send_welcome_message(chat_id)
+
+    elsif payload.start_with?('ref_')
+      # Реферальная ссылка: ref_PRODUCT_SHORTCODE (например ref_tracker_abc123)
+      Rails.logger.info "Referral link detected: #{payload}"
+      handle_referral_start(chat_id, payload, from)
+
+    else
+      # Авторизация с сайта: hex token (32 символа)
+      Rails.logger.info "Auth token detected, sending auth message"
+      result = send_auth_message(chat_id, payload, from)
+      Rails.logger.info "Auth message sent result: #{result.inspect}"
     end
   rescue => e
     Rails.logger.error "Error in handle_start_command: #{e.message}"
     Rails.logger.error e.backtrace.join("\n")
+  end
+
+  # Обработка реферальной ссылки (переход с рекламы)
+  def handle_referral_start(chat_id, payload, from)
+    # Парсим payload: ref_PRODUCT_SHORTCODE → ["ref", "product", "shortcode"]
+    parts = payload.split('_', 3)
+    product = parts[1]      # tracker, course, consulting
+    short_code = parts[2]   # abc123
+
+    Rails.logger.info "Referral: product=#{product}, short_code=#{short_code}"
+
+    # Находим traffic source
+    source = TrafficSource.find_by(short_code: short_code)
+
+    # Находим или создаём пользователя
+    user = User.find_or_initialize_by(telegram_id: from["id"])
+    user.assign_attributes(
+      username: from["username"],
+      first_name: from["first_name"],
+      last_name: from["last_name"]
+    )
+
+    # Привязываем traffic source если ещё не привязан
+    if source && user.traffic_source_id.nil?
+      user.traffic_source_id = source.id
+      user.utm_params = {
+        short_code: short_code,
+        product: product,
+        utm_source: source.utm_source,
+        utm_medium: source.utm_medium,
+        utm_campaign: source.utm_campaign
+      }.to_json
+
+      # Увеличиваем счётчик лидов
+      source.increment!(:leads_count)
+      Rails.logger.info "Attached traffic source '#{source.name}' to user #{from['id']}, leads_count now #{source.leads_count}"
+    end
+
+    # Получаем аватарку
+    avatar_url = fetch_user_avatar(from["id"])
+    user.avatar_url = avatar_url if avatar_url
+
+    user.save!
+
+    # Отправляем персонализированное приветствие в зависимости от продукта
+    send_product_welcome_message(chat_id, user, product, source)
+  end
+
+  # Персонализированное приветствие по продукту
+  def send_product_welcome_message(chat_id, user, product, source)
+    # Разные приветствия для разных продуктов
+    messages = {
+      'tracker' => {
+        title: "📍 AI Delivery Tracker",
+        text: "система отслеживания курьеров для доставки еды на Бали",
+        cta: "Узнать подробнее о трекере"
+      },
+      'course' => {
+        title: "📚 Bali Food Delivery Master",
+        text: "курс по запуску сервиса доставки еды на Бали",
+        cta: "Получить бесплатные уроки"
+      },
+      'consulting' => {
+        title: "💼 Booster Delivery Consulting",
+        text: "консалтинг по масштабированию delivery бизнеса",
+        cta: "Записаться на консультацию"
+      }
+    }
+
+    msg_config = messages[product] || messages['course']
+
+    welcome_text = <<~TEXT
+      👋 Привет, #{user.first_name}!
+
+      Вы пришли по ссылке: *#{msg_config[:title]}*
+      #{msg_config[:text]}
+
+      Я — AI-ассистент, который поможет вам разобраться и ответит на вопросы.
+
+      Напишите мне, что вас интересует! 💬
+    TEXT
+
+    # Создаём или получаем беседу
+    conversation = user.conversation
+
+    # Сохраняем продукт интереса в беседе (опционально)
+    conversation.update(ai_context: { interested_product: product }.to_json) if conversation.respond_to?(:ai_context)
+
+    # Отправляем сообщение
+    result = bot_client.api.send_message(
+      chat_id: chat_id,
+      text: welcome_text,
+      parse_mode: "Markdown"
+    )
+
+    # Сохраняем в историю
+    conversation.messages.create!(
+      body: welcome_text,
+      direction: :outgoing,
+      telegram_message_id: result&.message_id,
+      read: true,
+      user_id: nil
+    )
+
+    # Broadcast для админа
+    ActionCable.server.broadcast("messenger_channel", {
+      type: "new_conversation",
+      conversation_id: conversation.id,
+      product: product,
+      source: source&.name
+    })
+
+    Rails.logger.info "Product welcome message sent for #{product}"
   end
 
   def handle_callback_query(callback_query)

@@ -57,7 +57,7 @@ class TrafficSourcesController < ApplicationController
 
   def traffic_source_params
     params.require(:traffic_source).permit(
-      :name, :utm_source, :utm_medium, :utm_campaign,
+      :name, :product, :utm_source, :utm_medium, :utm_campaign,
       :link_type, :target_url, :short_code
     )
   end
