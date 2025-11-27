@@ -18,7 +18,7 @@ Rails.application.routes.draw do
   # COURSE DOMAIN - course.aidelivery.tech
   # ========================================
   constraints(DomainConstraint.new('course')) do
-    root "home#index"
+    root "home#index", as: :course_root
 
     # Course routes
     get "dashboard", to: "dashboard#index"
@@ -31,7 +31,7 @@ Rails.application.routes.draw do
   # ========================================
   constraints(DomainConstraint.new('crm')) do
     # Root для CRM - welcome page с авторизацией
-    root "crm_home#index"
+    root "crm_home#index", as: :crm_root
 
     # CRM routes (Admin only)
     get "crm", to: "crm#index", as: :crm
