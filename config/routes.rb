@@ -33,7 +33,7 @@ Rails.application.routes.draw do
   # COURSE DOMAIN - course.aidelivery.tech
   # ========================================
   constraints(DomainConstraint.new('course')) do
-    root "home#index"
+    root "home#index", as: :course_root
     get "dashboard", to: "dashboard#index"
     get "freecontent", to: "free_lessons#index", as: :freecontent
     get "freecontent/:id", to: "free_lessons#show", as: :freecontent_lesson
@@ -43,7 +43,7 @@ Rails.application.routes.draw do
   # CRM DOMAIN - crm.aidelivery.tech
   # ========================================
   constraints(DomainConstraint.new('crm')) do
-    root "crm_home#index"
+    root "crm_home#index", as: :crm_root
 
     get "crm", to: "crm#index", as: :crm
     patch "crm/users/:id/update_status", to: "crm#update_status", as: :crm_update_user_status
@@ -78,6 +78,6 @@ Rails.application.routes.draw do
       resources :traffic_sources
     end
 
-    root to: redirect('/course')
+    root to: redirect('/course'), as: :dev_root
   end
 end
