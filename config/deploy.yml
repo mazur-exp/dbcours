@@ -7,7 +7,11 @@ image: mazur-exp/dbcours
 # Deploy to these servers.
 servers:
   web:
-    - 46.62.195.19
+    hosts:
+      - 46.62.195.19
+    labels:
+      traefik.http.routers.dbcours-web.rule: "Host(`crm.aidelivery.tech`) || Host(`course.aidelivery.tech`)"
+      traefik.http.routers.dbcours-web-secure.rule: "Host(`crm.aidelivery.tech`) || Host(`course.aidelivery.tech`)"
   job:
     hosts:
       - 46.62.195.19
@@ -24,9 +28,6 @@ servers:
 proxy:
   ssl: true
   host: crm.aidelivery.tech
-  app_labels:
-    traefik.http.routers.dbcours.rule: "Host(`crm.aidelivery.tech`) || Host(`course.aidelivery.tech`)"
-    traefik.http.routers.dbcours-secure.rule: "Host(`crm.aidelivery.tech`) || Host(`course.aidelivery.tech`)"
 
 # Credentials for your image host.
 registry:
