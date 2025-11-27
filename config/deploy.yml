@@ -7,7 +7,10 @@ image: mazur-exp/dbcours
 # Deploy to these servers.
 servers:
   web:
-    - 46.62.195.19
+    hosts:
+      - 46.62.195.19
+    labels:
+      traefik.http.routers.dbcours.rule: "Host(`course.aidelivery.tech`) || Host(`crm.aidelivery.tech`)"
   job:
     hosts:
       - 46.62.195.19
