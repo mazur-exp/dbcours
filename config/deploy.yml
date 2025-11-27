@@ -23,9 +23,10 @@ servers:
 # Note: If using Cloudflare, set encryption mode in SSL/TLS setting to "Full" to enable CF-to-app encryption.
 proxy:
   ssl: true
-  host:
-    - course.aidelivery.tech
-    - crm.aidelivery.tech
+  host: crm.aidelivery.tech
+  app_labels:
+    traefik.http.routers.dbcours.rule: "Host(`crm.aidelivery.tech`) || Host(`course.aidelivery.tech`)"
+    traefik.http.routers.dbcours-secure.rule: "Host(`crm.aidelivery.tech`) || Host(`course.aidelivery.tech`)"
 
 # Credentials for your image host.
 registry:
