@@ -1,4 +1,18 @@
-require_relative '../lib/domain_constraint'
+# Domain constraint для routing по поддоменам
+class DomainConstraint
+  def initialize(subdomain)
+    @subdomain = subdomain
+  end
+
+  def matches?(request)
+    if Rails.env.production?
+      request.subdomain == @subdomain
+    else
+      request.params[:domain] == @subdomain ||
+        request.path.start_with?("/#{@subdomain}")
+    end
+  end
+end
 
 Rails.application.routes.draw do
   # Health check и PWA доступны на всех доменах
