@@ -6,9 +6,7 @@ class DomainConstraint
 
   def matches?(request)
     if Rails.env.production?
-      result = request.host == @host
-      Rails.logger.info "🔍 DomainConstraint: host=#{request.host.inspect} expected=#{@host.inspect} match=#{result}"
-      result
+      request.host == @host
     else
       # Development fallback
       request.params[:domain] == @host.split('.').first ||
