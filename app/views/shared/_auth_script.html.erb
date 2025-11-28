@@ -70,7 +70,7 @@
                 'Content-Type': 'application/json',
                 'X-CSRF-Token': document.querySelector('[name="csrf-token"]').content
               },
-              credentials: 'same-origin'  // Явно указываем для Safari
+              credentials: 'include'  // Для cross-subdomain cookie sharing
             })
 
             const data = await response.json()
@@ -139,7 +139,9 @@
 
                     // СРАЗУ проверяем авторизацию через API
                     try {
-                      const response = await fetch(`/auth/check_token?session_token=${sessionToken}`)
+                      const response = await fetch(`/auth/check_token?session_token=${sessionToken}`, {
+                        credentials: 'include'
+                      })
                       const result = await response.json()
 
                       console.log('>>> Auth check result:', result)
@@ -193,7 +195,7 @@
 
     async function checkAuthStatus(button) {
       try {
-        const response = await fetch('/auth/status')
+        const response = await fetch('/auth/status', { credentials: 'include' })
         const data = await response.json()
 
         if (data.authenticated && data.user) {
@@ -217,7 +219,7 @@
 
       // Проверяем авторизацию
       try {
-        const response = await fetch('/auth/status')
+        const response = await fetch('/auth/status', { credentials: 'include' })
         const data = await response.json()
 
         console.log('>>> Auth status on page load:', data.authenticated)
@@ -291,7 +293,9 @@
 
       // Проверяем токен на сервере чтобы сохранить сессию
       try {
-        const response = await fetch(`/auth/check_token?session_token=${data.session_token || sessionToken}`)
+        const response = await fetch(`/auth/check_token?session_token=${data.session_token || sessionToken}`, {
+          credentials: 'include'
+        })
         const result = await response.json()
 
         if (result.authenticated) {
