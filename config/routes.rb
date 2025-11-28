@@ -11,6 +11,7 @@ Rails.application.routes.draw do
   post "auth/telegram/webhook", to: "auth#webhook"
   get "auth/status", to: "auth#status"
   get "auth/check_token", to: "auth#check_token"
+  get "auth/complete", to: "auth#complete"  # Token-based auth completion via redirect
   post "auth/set_session", to: "auth#set_session"
   delete "auth/logout", to: "auth#logout", as: :auth_logout
 

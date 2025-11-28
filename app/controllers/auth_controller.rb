@@ -33,7 +33,7 @@ class AuthController < ApplicationController
     render json: { authenticated: false }
   end
 
-  # Проверяет авторизацию по session_token
+  # Проверяет авторизацию по session_token (для AJAX запросов)
   # ВАЖНО: Не требуем совпадения session[:auth_token] т.к. cookie может не приходить
   # в incognito режиме или из-за SameSite политик. Достаточно проверки токена в БД.
   def check_token
@@ -56,6 +56,30 @@ class AuthController < ApplicationController
       }
     else
       render json: { authenticated: false }
+    end
+  end
+
+  # Завершение авторизации через redirect (работает когда cookies блокируются)
+  # Вызывается как: GET /auth/complete?token=xxx&redirect_to=/freecontent
+  def complete
+    session_token = params[:token]
+    redirect_path = params[:redirect_to] || "/freecontent"
+
+    # Проверяем токен
+    user = User.find_by(session_token: session_token, authenticated: true)
+
+    if user
+      # Устанавливаем сессию - при redirect Set-Cookie обычно принимается
+      session[:user_id] = user.id
+      session[:auth_token] = session_token
+
+      Rails.logger.info "Auth complete: user #{user.id} authenticated, redirecting to #{redirect_path}"
+
+      # Редирект на нужную страницу
+      redirect_to redirect_path, notice: "✅ Авторизация успешна! Добро пожаловать, #{user.first_name}!"
+    else
+      Rails.logger.warn "Auth complete failed: invalid token #{session_token}"
+      redirect_to "/freecontent", alert: "Ошибка авторизации. Попробуйте снова."
     end
   end
 

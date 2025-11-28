@@ -137,7 +137,7 @@
 
                     showWaitingStatus(authBtn)
 
-                    // СРАЗУ проверяем авторизацию через API
+                    // Проверяем авторизацию и используем redirect для установки сессии
                     try {
                       const response = await fetch(`/auth/check_token?session_token=${sessionToken}`, {
                         credentials: 'include'
@@ -147,15 +147,10 @@
                       console.log('>>> Auth check result:', result)
 
                       if (result.authenticated) {
-                        // Авторизация успешна!
-                        console.log('>>> Authentication successful!')
-                        updateButtonAsAuthenticated(authBtn, result.user)
-                        showSuccessNotification()
-
-                        // Перезагружаем страницу
-                        setTimeout(() => {
-                          window.location.reload()
-                        }, 1500)
+                        // Авторизация успешна - используем redirect для установки сессии
+                        console.log('>>> Authentication successful, redirecting...')
+                        const currentPath = window.location.pathname
+                        window.location.href = `/auth/complete?token=${sessionToken}&redirect_to=${encodeURIComponent(currentPath)}`
                       } else {
                         // Если еще не авторизован - подключаем WebSocket
                         console.log('>>> Not authenticated yet, connecting WebSocket')
@@ -291,31 +286,13 @@
     async function handleAuthSuccess(data) {
       console.log('handleAuthSuccess called with:', data)
 
-      // Проверяем токен на сервере чтобы сохранить сессию
-      try {
-        const response = await fetch(`/auth/check_token?session_token=${data.session_token || sessionToken}`, {
-          credentials: 'include'
-        })
-        const result = await response.json()
+      const token = data.session_token || sessionToken
+      const currentPath = window.location.pathname
 
-        if (result.authenticated) {
-          const authButton = document.getElementById('auth-button')
-          updateButtonAsAuthenticated(authButton, result.user)
-
-          // Закрываем модальное окно
-          hideAuthModal()
-
-          // Показываем уведомление
-          showSuccessNotification()
-
-          // Перезагружаем страницу
-          setTimeout(() => {
-            window.location.reload()
-          }, 1500)
-        }
-      } catch (error) {
-        console.error('Failed to check token:', error)
-      }
+      // Используем redirect вместо fetch для установки сессии
+      // Это работает даже когда cookies блокируются в incognito режиме
+      console.log('Redirecting to /auth/complete for session setup...')
+      window.location.href = `/auth/complete?token=${token}&redirect_to=${encodeURIComponent(currentPath)}`
     }
 
     function showWaitingStatus(button) {
