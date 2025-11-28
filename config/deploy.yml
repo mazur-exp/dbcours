@@ -30,6 +30,8 @@ servers:
 proxy:
   ssl: true
   host: crm.aidelivery.tech
+  app_options:
+    add-host: course.aidelivery.tech
 
 # Credentials for your image host.
 registry:
