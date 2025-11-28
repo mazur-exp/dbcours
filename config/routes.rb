@@ -18,23 +18,29 @@ Rails.application.routes.draw do
   post "api/n8n/send_message", to: "n8n#send_message", as: :n8n_send_message
 
   if Rails.env.production?
-    # ===== COURSE DOMAIN (course.aidelivery.tech) =====
-    constraints(host: "course.aidelivery.tech") do
-      root "home#index", as: :course_root
-      get "dashboard", to: "dashboard#index", as: :course_dashboard
-      get "freecontent", to: "free_lessons#index", as: :course_freecontent
-      get "freecontent/:id", to: "free_lessons#show", as: :course_freecontent_lesson
-    end
-
-    # ===== CRM DOMAIN (crm.aidelivery.tech) =====
+    # ===== CRM DOMAIN - MUST BE FIRST! =====
+    # This intercepts "/" on crm.aidelivery.tech before global root
     constraints(host: "crm.aidelivery.tech") do
-      # CRM landing page (login)
-      root "crm/home#index", as: :crm_root
+      get "/", to: "crm/home#index", as: :crm_root
+    end
+  end
 
-      # Short links - public, no auth required
-      get "s/:code", to: "short_links#redirect", as: :short_link
+  # ===== GLOBAL ROUTES (work on both domains) =====
+  # These create root_path, dashboard_path, freecontent_path helpers
+  # On crm domain: "/" is already intercepted above
+  # On course domain: "/" falls through to this
+  root "home#index"
+  get "dashboard", to: "dashboard#index", as: :dashboard
+  get "freecontent", to: "free_lessons#index", as: :freecontent
+  get "freecontent/:id", to: "free_lessons#show", as: :freecontent_lesson
 
-      # CRM namespace - all admin-only routes
+  # Short links - public, work on both domains
+  get "s/:code", to: "short_links#redirect", as: :short_link
+
+  # CRM namespace routes
+  if Rails.env.production?
+    # Production: CRM routes only on crm.aidelivery.tech
+    constraints(host: "crm.aidelivery.tech") do
       namespace :crm, path: "" do
         # Dashboard (Kanban)
         get "crm", to: "dashboard#index", as: :dashboard
@@ -54,20 +60,9 @@ Rails.application.routes.draw do
       end
     end
   else
-    # ===== DEVELOPMENT (no domain constraint) =====
-    # Course domain routes (default)
-    root "home#index"
-    get "dashboard", to: "dashboard#index"
-    get "freecontent", to: "free_lessons#index", as: :freecontent
-    get "freecontent/:id", to: "free_lessons#show", as: :freecontent_lesson
-
-    # Short links - public
-    get "s/:code", to: "short_links#redirect", as: :short_link
-
-    # CRM root (landing page) - accessible in development
+    # Development: no domain constraints
     get "crm_login", to: "crm/home#index", as: :crm_root
 
-    # CRM namespace routes for development
     namespace :crm, path: "" do
       get "crm", to: "dashboard#index", as: :dashboard
       patch "crm/users/:id/update_status", to: "dashboard#update_status", as: :update_user_status
