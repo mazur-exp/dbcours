@@ -807,6 +807,108 @@ Body: {"telegram_id": {{$json.user.telegram_id}}, "text": "..."}
 
 ---
 
+## Issue #12: Cookies Not Shared Between Subdomains (tld_length Misconfiguration)
+
+### Problem
+
+**Symptom:**
+- User authenticates on `crm.aidelivery.tech`
+- Cookie exists and works on CRM domain
+- Navigates to `course.aidelivery.tech`
+- Session cookie not sent with requests
+- `/auth/status` returns `authenticated: false` despite valid session on other subdomain
+- Logout doesn't work properly across domains
+
+**Root Cause:**
+- Session store configured with `tld_length: 1` for `.tech` TLD
+- Rails incorrectly calculated cookie domain as `domain=tech` instead of `domain=.aidelivery.tech`
+- Browsers don't accept cookies with invalid domain (bare TLD)
+
+**Discovery Method (Chrome DevTools):**
+```
+Response Headers for /freecontent:
+set-cookie: _dbcours_session=...; domain=tech; path=/; secure; httponly; samesite=lax
+                                  ^^^^^^^^^^^^
+                                  WRONG! Should be domain=.aidelivery.tech
+```
+
+**Original (Wrong) Configuration:**
+```ruby
+# config/initializers/session_store.rb
+Rails.application.config.session_store :cookie_store,
+  key: "_dbcours_session",
+  domain: :all,
+  tld_length: 1,  # ← PROBLEM: Treats .tech as TLD, calculates domain as "tech"
+  secure: Rails.env.production?,
+  httponly: true,
+  same_site: :lax
+```
+
+**Why `tld_length: 1` Was Wrong:**
+- `tld_length` counts parts from the RIGHT side of the domain
+- For `course.aidelivery.tech`:
+  - With `tld_length: 1` → Rails thinks TLD = `tech`, domain = `tech` (WRONG)
+  - With `tld_length: 2` → Rails thinks TLD = `aidelivery.tech`, domain = `.aidelivery.tech` (CORRECT)
+
+---
+
+### Solution
+
+**Fixed Configuration:**
+```ruby
+# config/initializers/session_store.rb
+Rails.application.config.session_store :cookie_store,
+  key: "_dbcours_session",
+  domain: :all,
+  tld_length: 2,  # ← FIXED: aidelivery.tech = 2 parts
+  secure: Rails.env.production?,
+  httponly: true,
+  same_site: :lax
+```
+
+**Alternative (Explicit Domain):**
+```ruby
+Rails.application.config.session_store :cookie_store,
+  key: "_dbcours_session",
+  domain: ".aidelivery.tech",  # ← Explicit domain, no tld_length calculation
+  secure: Rails.env.production?,
+  httponly: true,
+  same_site: :lax
+```
+
+**Result After Fix:**
+```
+Response Headers for /freecontent:
+set-cookie: _dbcours_session=...; domain=.aidelivery.tech; path=/; secure; httponly; samesite=lax
+                                  ^^^^^^^^^^^^^^^^^^^^^^^
+                                  CORRECT! Shared across all subdomains
+```
+
+**Why it Works:**
+- Cookie domain `.aidelivery.tech` applies to:
+  - `crm.aidelivery.tech` ✓
+  - `course.aidelivery.tech` ✓
+  - Any future subdomains ✓
+- Session shared across all subdomains
+- Single sign-on experience for users
+
+**Debugging Guide for Future TLD Issues:**
+1. Open Chrome DevTools → Network tab
+2. Find any HTML request (not asset)
+3. Check Response Headers for `set-cookie`
+4. Verify `domain=` value is correct
+5. If wrong, adjust `tld_length` or use explicit domain
+
+**Common tld_length Values:**
+| Domain | tld_length | Resulting Cookie Domain |
+|--------|------------|-------------------------|
+| `example.com` | 1 | `.example.com` ✓ (but wrong) |
+| `example.co.uk` | 2 | `.example.co.uk` ✓ |
+| `example.aidelivery.tech` | 2 | `.aidelivery.tech` ✓ |
+| `localhost` | 1 | (no domain) |
+
+---
+
 ## Known Limitations (Not Issues)
 
 ### SQLite Concurrency
