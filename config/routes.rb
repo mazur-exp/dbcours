@@ -17,25 +17,30 @@ Rails.application.routes.draw do
   # N8N API
   post "api/n8n/send_message", to: "n8n#send_message", as: :n8n_send_message
 
+  # Short links - public, work on both domains
+  get "s/:code", to: "short_links#redirect", as: :short_link
+
   if Rails.env.production?
-    # ===== CRM DOMAIN - MUST BE FIRST! =====
-    # This intercepts "/" on crm.aidelivery.tech before global root
+    # ===== CRM DOMAIN =====
     constraints(host: "crm.aidelivery.tech") do
       get "/", to: "crm/home#index", as: :crm_root
     end
+
+    # ===== COURSE DOMAIN =====
+    # Course pages only on course.aidelivery.tech
+    constraints(host: "course.aidelivery.tech") do
+      root "home#index"
+      get "dashboard", to: "dashboard#index", as: :dashboard
+      get "freecontent", to: "free_lessons#index", as: :freecontent
+      get "freecontent/:id", to: "free_lessons#show", as: :freecontent_lesson
+    end
+  else
+    # ===== DEVELOPMENT (no domain constraints) =====
+    root "home#index"
+    get "dashboard", to: "dashboard#index", as: :dashboard
+    get "freecontent", to: "free_lessons#index", as: :freecontent
+    get "freecontent/:id", to: "free_lessons#show", as: :freecontent_lesson
   end
-
-  # ===== GLOBAL ROUTES (work on both domains) =====
-  # These create root_path, dashboard_path, freecontent_path helpers
-  # On crm domain: "/" is already intercepted above
-  # On course domain: "/" falls through to this
-  root "home#index"
-  get "dashboard", to: "dashboard#index", as: :dashboard
-  get "freecontent", to: "free_lessons#index", as: :freecontent
-  get "freecontent/:id", to: "free_lessons#show", as: :freecontent_lesson
-
-  # Short links - public, work on both domains
-  get "s/:code", to: "short_links#redirect", as: :short_link
 
   # CRM namespace routes
   if Rails.env.production?
