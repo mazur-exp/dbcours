@@ -30,6 +30,8 @@ servers:
 proxy:
   ssl: true
   host: course.aidelivery.tech
+  env:
+    KAMAL_PROXY_HOST: "course.aidelivery.tech,crm.aidelivery.tech"
 
 # Credentials for your image host.
 registry:
