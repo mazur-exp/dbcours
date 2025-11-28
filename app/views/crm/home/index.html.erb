@@ -32,14 +32,18 @@
       </div>
 
       <!-- Logout button -->
-      <%= button_to auth_logout_path, method: :delete, class: "w-full bg-gray-700 hover:bg-gray-600 text-white font-medium py-3 px-6 rounded-xl transition-all", form: { data: { turbo: false } } do %>
-        <span class="flex items-center justify-center gap-2">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-          </svg>
-          Выйти и войти другим аккаунтом
-        </span>
-      <% end %>
+      <form action="<%= auth_logout_path %>" method="post" data-turbo="false" class="w-full">
+        <input type="hidden" name="_method" value="delete">
+        <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>">
+        <button type="submit" class="w-full bg-gray-700 hover:bg-gray-600 text-white font-medium py-3 px-6 rounded-xl transition-all">
+          <span class="flex items-center justify-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+            </svg>
+            Выйти и войти другим аккаунтом
+          </span>
+        </button>
+      </form>
     <% else %>
       <!-- Not logged in - show login prompt -->
       <div class="bg-gray-800/50 border border-gray-700 rounded-xl p-6 backdrop-blur-sm">
