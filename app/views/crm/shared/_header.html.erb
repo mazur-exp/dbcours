@@ -1,0 +1,46 @@
+<%# Unified CRM Header
+   Usage: <%= render 'crm/shared/header', page_title: 'CRM' %>
+   Optional: stats (hash), extra_links (array of {path:, label:})
+%>
+<% page_title ||= 'CRM' %>
+<% stats ||= nil %>
+<% extra_links ||= [] %>
+<% crm_root = Rails.env.production? ? "https://crm.aidelivery.tech" : "/crm_login" %>
+
+<nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
+  <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex justify-between h-16">
+      <div class="flex items-center">
+        <div class="flex-shrink-0 flex items-center">
+          <%= link_to crm_root, class: "text-xl md:text-2xl font-bold text-green-600" do %>
+            <span class="hidden sm:inline">Delivery Booster</span>
+            <span class="sm:hidden">DB</span>
+          <% end %>
+          <span class="ml-4 text-gray-400">|</span>
+          <span class="ml-4 text-lg font-semibold text-gray-700"><%= page_title %></span>
+        </div>
+      </div>
+      <div class="flex items-center gap-4">
+        <% if stats.present? %>
+          <!-- Статистика -->
+          <div class="hidden md:flex items-center gap-6 text-sm">
+            <% stats.each do |stat| %>
+              <div class="flex items-center gap-2">
+                <span class="text-gray-500"><%= stat[:label] %>:</span>
+                <span class="font-bold <%= stat[:color] || 'text-gray-900' %>"><%= stat[:icon] %> <%= stat[:value] %></span>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+
+        <% extra_links.each do |link| %>
+          <%= link_to link[:path], class: "text-sm text-gray-600 hover:text-gray-900" do %>
+            <%= link[:label] %>
+          <% end %>
+        <% end %>
+
+        <%= render 'shared/auth_button' %>
+      </div>
+    </div>
+  </div>
+</nav>

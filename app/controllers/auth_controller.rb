@@ -75,9 +75,13 @@ class AuthController < ApplicationController
   def logout
     reset_session  # Полная очистка всей сессии
 
-    # В production редиректим на course домен, в development - на относительный путь
+    # Редиректим на правильный домен в зависимости от источника запроса
     if Rails.env.production?
-      redirect_to "https://course.aidelivery.tech/freecontent", notice: "Вы успешно вышли из системы"
+      if request.host == "crm.aidelivery.tech"
+        redirect_to "https://crm.aidelivery.tech/", notice: "Вы успешно вышли из системы"
+      else
+        redirect_to "https://course.aidelivery.tech/freecontent", notice: "Вы успешно вышли из системы"
+      end
     else
       redirect_to freecontent_path, notice: "Вы успешно вышли из системы"
     end

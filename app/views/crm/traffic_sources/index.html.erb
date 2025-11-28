@@ -1,24 +1,7 @@
 <div class="min-h-screen bg-gray-50">
-  <!-- Навигация -->
-  <nav class="bg-white shadow-sm border-b border-gray-200">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-between h-16">
-        <div class="flex items-center gap-4">
-          <%= link_to root_path, class: "text-xl font-bold text-green-600" do %>
-            📚 BFDM
-          <% end %>
-          <span class="text-gray-400">|</span>
-          <span class="text-lg font-semibold text-gray-700">Источники трафика</span>
-        </div>
-        <div class="flex items-center gap-4">
-          <%= link_to crm_dashboard_path, class: "text-sm text-gray-600 hover:text-gray-900" do %>
-            ← Вернуться в CRM
-          <% end %>
-          <%= render 'shared/auth_button' %>
-        </div>
-      </div>
-    </div>
-  </nav>
+  <%= render 'crm/shared/header',
+      page_title: 'Источники трафика',
+      extra_links: [{ path: crm_dashboard_path, label: '← Вернуться в CRM' }] %>
 
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <!-- Статистика -->
