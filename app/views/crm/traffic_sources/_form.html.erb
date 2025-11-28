@@ -78,7 +78,7 @@
     <!-- Кнопки -->
     <div class="flex items-center gap-4">
       <%= form.submit traffic_source.persisted? ? "Сохранить" : "Создать источник", class: "bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors" %>
-      <%= link_to "Отмена", traffic_sources_path, class: "text-gray-600 hover:text-gray-900" %>
+      <%= link_to "Отмена", crm_traffic_sources_path, class: "text-gray-600 hover:text-gray-900" %>
     </div>
   </div>
 <% end %>

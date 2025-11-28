@@ -13,7 +13,7 @@
         </div>
         <div class="flex items-center gap-4">
           <% if @current_user&.admin? %>
-            <%= link_to messenger_business_connections_path, class: "text-gray-600 hover:text-gray-900 flex items-center gap-1" do %>
+            <%= link_to crm_business_connections_path, class: "text-gray-600 hover:text-gray-900 flex items-center gap-1" do %>
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
               </svg>
@@ -370,7 +370,7 @@
               <!-- Опасная зона - только для админов -->
               <div class="border-t border-gray-200 mt-6 pt-6">
                 <h4 class="text-sm font-semibold text-red-600 mb-3">Опасная зона</h4>
-                <%= button_to messenger_delete_user_path(@active_user),
+                <%= button_to crm_delete_user_path(@active_user),
                     method: :delete,
                     data: {
                       turbo_confirm: "Вы уверены, что хотите удалить пользователя #{@active_user.full_name}?\n\nЭто действие необратимо и удалит:\n• Аккаунт пользователя\n• Всю авторизацию\n• Всю переписку с пользователем\n• Все связанные данные"

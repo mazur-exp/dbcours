@@ -39,7 +39,7 @@
   <div class="p-4 overflow-x-auto">
     <div class="inline-flex gap-4 min-w-full">
       <% User.crm_statuses.keys.each do |status| %>
-        <%= render 'crm/kanban_column', status: status, users: @users_by_status[status] %>
+        <%= render 'crm/dashboard/kanban_column', status: status, users: @users_by_status[status] %>
       <% end %>
     </div>
   </div>
