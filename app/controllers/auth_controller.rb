@@ -74,7 +74,13 @@ class AuthController < ApplicationController
   # Завершает сессию пользователя
   def logout
     reset_session  # Полная очистка всей сессии
-    redirect_to freecontent_path, notice: "Вы успешно вышли из системы"
+
+    # В production редиректим на course домен, в development - на относительный путь
+    if Rails.env.production?
+      redirect_to "https://course.aidelivery.tech/freecontent", notice: "Вы успешно вышли из системы"
+    else
+      redirect_to freecontent_path, notice: "Вы успешно вышли из системы"
+    end
   end
 
   # Webhook от Telegram бота
