@@ -34,13 +34,21 @@ class AuthController < ApplicationController
   end
 
   # Проверяет авторизацию по session_token
+  # ВАЖНО: Не требуем совпадения session[:auth_token] т.к. cookie может не приходить
+  # в incognito режиме или из-за SameSite политик. Достаточно проверки токена в БД.
   def check_token
     session_token = params[:session_token]
 
+    # Проверяем только что:
+    # 1. Пользователь существует с этим токеном
+    # 2. Пользователь прошёл авторизацию через Telegram (authenticated: true)
     user = User.find_by(session_token: session_token, authenticated: true)
 
-    if user && session[:auth_token] == session_token
+    if user
+      # Устанавливаем сессию
       session[:user_id] = user.id
+      session[:auth_token] = session_token  # Синхронизируем токен
+
       render json: {
         authenticated: true,
         user_id: user.id,
