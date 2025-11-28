@@ -346,6 +346,36 @@ ai_docs/
 
 ---
 
+### 13. multi_domain_architecture.md
+**Purpose:** Multi-domain setup and configuration
+
+**Contents:**
+- Two-domain architecture (course.aidelivery.tech + crm.aidelivery.tech)
+- Cookie sharing configuration
+- `tld_length` explanation for `.tech` TLD
+- Domain-constrained routing in Rails
+- Debugging tips for cookie issues
+- Kamal deployment for multiple domains
+
+**Use When:** Understanding domain setup, debugging cross-domain issues, configuring new subdomains
+
+---
+
+### 14. cross_domain_sessions.md
+**Purpose:** Cross-domain session management and authentication
+
+**Contents:**
+- Single Sign-On implementation
+- Token-based auth completion (`/auth/complete` endpoint)
+- Logout across domains (Turbo cache issues)
+- Cookie configuration details
+- Common errors and solutions
+- Debugging cross-domain auth
+
+**Use When:** Debugging auth issues across domains, understanding session flow, fixing logout problems
+
+---
+
 ## How to Use This Documentation
 
 ### For New Team Members
@@ -455,8 +485,8 @@ ai_docs/
 ### File Count
 - **Business:** 5 files
 - **UI:** 4 files
-- **Development:** 12 files
-- **Total:** 21 documentation files
+- **Development:** 14 files
+- **Total:** 23 documentation files
 
 ### Total Word Count
 - **Approximate:** 75,000+ words
@@ -464,7 +494,7 @@ ai_docs/
 
 ### Last Updated
 - **Initial Creation:** January 2025
-- **Last Major Update:** January 12, 2025 (Callback URL feature, Kamal deployment updates, PWA implementation)
+- **Last Major Update:** November 28, 2025 (Multi-domain architecture, Cross-domain sessions, tld_length fix)
 - **Update Frequency:** After each major feature release
 
 ---
