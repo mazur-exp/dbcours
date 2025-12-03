@@ -1,0 +1,69 @@
+<div class="min-h-screen flex items-center justify-center px-4">
+  <div class="max-w-md w-full text-center">
+    <!-- Logo -->
+    <div class="mb-8">
+      <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl shadow-lg mb-6">
+        <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
+      </div>
+      <h1 class="text-3xl font-bold text-white mb-2">Analytics Dashboard</h1>
+      <p class="text-gray-400">Delivery Booster</p>
+    </div>
+
+    <% if @current_user %>
+      <!-- User is logged in but not admin -->
+      <div class="bg-red-900/30 border border-red-500/50 rounded-xl p-6 mb-6 backdrop-blur-sm">
+        <div class="flex items-center justify-center mb-4">
+          <div class="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center">
+            <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+          </div>
+        </div>
+        <h3 class="text-lg font-semibold text-red-300 mb-2">Доступ ограничен</h3>
+        <p class="text-red-200/80 text-sm mb-4">
+          Вы авторизованы как <strong><%= @current_user.first_name || @current_user.username || 'Пользователь' %></strong>,
+          но у вас нет прав администратора для доступа к Analytics Dashboard.
+        </p>
+        <p class="text-gray-400 text-xs">
+          Если вы считаете, что это ошибка, свяжитесь с администратором.
+        </p>
+      </div>
+
+      <!-- Logout button -->
+      <form action="<%= auth_logout_path %>" method="post" data-turbo="false" class="w-full">
+        <input type="hidden" name="_method" value="delete">
+        <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>">
+        <button type="submit" class="w-full bg-gray-700 hover:bg-gray-600 text-white font-medium py-3 px-6 rounded-xl transition-all">
+          <span class="flex items-center justify-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+            </svg>
+            Выйти и войти другим аккаунтом
+          </span>
+        </button>
+      </form>
+    <% else %>
+      <!-- Not logged in - show login prompt -->
+      <div class="bg-gray-800/50 border border-gray-700 rounded-xl p-6 backdrop-blur-sm">
+        <p class="text-gray-300 mb-6">
+          Войдите через Telegram для доступа к аналитике клиентов
+        </p>
+
+        <!-- Telegram login button -->
+        <button id="auth-button" class="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg hover:shadow-green-500/25 flex items-center justify-center gap-3">
+          <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+          </svg>
+          Войти через Telegram
+        </button>
+
+        <p class="text-gray-500 text-xs mt-4">
+          Только для администраторов команды
+        </p>
+      </div>
+    <% end %>
+
+  </div>
+</div>

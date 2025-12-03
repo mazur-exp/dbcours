@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_11_26_105503) do
+ActiveRecord::Schema[8.0].define(version: 2025_12_03_072944) do
   create_table "business_connections", force: :cascade do |t|
     t.string "business_connection_id", null: false
     t.integer "user_id", null: false
@@ -27,6 +27,21 @@ ActiveRecord::Schema[8.0].define(version: 2025_11_26_105503) do
     t.index ["user_id"], name: "index_business_connections_on_user_id"
   end
 
+  create_table "clients", force: :cascade do |t|
+    t.string "name", null: false
+    t.date "start_date"
+    t.text "goals"
+    t.text "notes"
+    t.string "contact_name"
+    t.string "contact_phone"
+    t.string "contact_telegram"
+    t.string "status", default: "active"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_clients_on_name"
+    t.index ["status"], name: "index_clients_on_status"
+  end
+
   create_table "conversations", force: :cascade do |t|
     t.integer "user_id", null: false
     t.datetime "last_message_at"
@@ -39,6 +54,19 @@ ActiveRecord::Schema[8.0].define(version: 2025_11_26_105503) do
     t.integer "ai_ready_score"
     t.boolean "ai_processing", default: false
     t.boolean "ai_paused", default: false, null: false
+    t.string "ai_restaurant_name"
+    t.string "ai_platform"
+    t.integer "ai_orders_per_day"
+    t.decimal "ai_rating", precision: 2, scale: 1
+    t.boolean "ai_uses_ads"
+    t.text "ai_main_problem"
+    t.string "ai_urgency"
+    t.boolean "ai_is_new_brand"
+    t.string "ai_location"
+    t.boolean "ai_is_pql", default: false
+    t.string "ai_action", default: "none"
+    t.json "ai_red_flags"
+    t.json "ai_pql_signals"
     t.index ["last_message_at"], name: "index_conversations_on_last_message_at"
     t.index ["user_id"], name: "index_conversations_on_user_id"
   end

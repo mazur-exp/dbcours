@@ -79,6 +79,14 @@
             </svg>
             <span>Источники трафика</span>
           <% end %>
+
+          <% admin_base = Rails.env.production? ? "https://admin.aidelivery.tech" : "/admin" %>
+          <%= link_to "#{admin_base}/dashboard", class: "flex items-center gap-3 px-4 py-3 hover:bg-gray-100 transition-colors text-gray-700" do %>
+            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+            <span>Analytics</span>
+          <% end %>
         <% end %>
 
         <div class="border-t border-gray-200 my-2"></div>

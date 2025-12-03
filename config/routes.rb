@@ -27,6 +27,15 @@ Rails.application.routes.draw do
       get "/", to: "crm/home#index", as: :crm_root
     end
 
+    # ===== ADMIN DOMAIN =====
+    constraints(host: "admin.aidelivery.tech") do
+      get "/", to: "admin/home#index", as: :admin_root
+
+      namespace :admin, path: "" do
+        get "dashboard", to: "dashboard#index", as: :dashboard
+      end
+    end
+
     # ===== COURSE DOMAIN =====
     # Course pages only on course.aidelivery.tech
     constraints(host: "course.aidelivery.tech") do
@@ -41,6 +50,12 @@ Rails.application.routes.draw do
     get "dashboard", to: "dashboard#index", as: :dashboard
     get "freecontent", to: "free_lessons#index", as: :freecontent
     get "freecontent/:id", to: "free_lessons#show", as: :freecontent_lesson
+
+    # Admin development routes
+    get "admin_login", to: "admin/home#index", as: :admin_root
+    namespace :admin, path: "admin" do
+      get "dashboard", to: "dashboard#index", as: :dashboard
+    end
   end
 
   # CRM namespace routes
