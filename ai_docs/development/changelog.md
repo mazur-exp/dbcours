@@ -6,6 +6,131 @@ This document tracks all significant changes, features, and updates to the Bali 
 
 ---
 
+## [December 3, 2025] - Admin Analytics Dashboard & Unified Header Design
+
+### Added
+
+- **Admin Analytics Dashboard (admin.aidelivery.tech)**
+  - New third domain for analytics and client management
+  - Login page with same pattern as CRM (redirect if admin)
+  - 3-column dashboard layout:
+    - Left: Clients list with search
+    - Center: Analytics charts + AI chat
+    - Right: Selected client info
+  - **Client model** for restaurant clients tracking
+    - Fields: name, contact_name, telegram_username, status, notes, goals, started_at
+    - Scopes: `active`, `ordered`
+    - Status colors: active (green), paused (yellow), churned (red)
+  - **Chart.js integration** via ESM importmap
+    - Line and bar charts for placeholder analytics
+    - Stimulus controller for Chart.js rendering
+  - **AI Chat placeholder** (stub responses, future N8N integration)
+  - **Files:**
+    - `app/controllers/admin/base_controller.rb` - Admin authorization
+    - `app/controllers/admin/home_controller.rb` - Login page
+    - `app/controllers/admin/dashboard_controller.rb` - Main dashboard
+    - `app/models/client.rb` - Client model
+    - `app/views/admin/**` - All admin views
+    - `app/views/layouts/admin.html.erb` - Admin layout
+    - `app/javascript/controllers/chart_controller.js` - Chart.js Stimulus
+    - `app/javascript/controllers/admin_chat_controller.js` - AI chat stub
+    - `db/migrate/XXX_create_clients.rb` - Client migration
+  - **Documentation:** `ai_docs/development/admin_analytics_dashboard.md`
+
+- **Unified Header Design Pattern**
+  - All CRM/Admin pages now use consistent header:
+    - Icon (dynamic per page) + "Delivery Booster" + page_title
+  - **Icon Map pattern** - SVG icons mapped by page_title:
+    - CRM: 👥 People icon
+    - Messenger: 💬 Chat bubble
+    - Источники трафика: 📈 Trending arrow
+    - Analytics Dashboard: 📊 Charts
+  - `page_title` variable for dynamic subtitle
+  - Shared `auth_button` partial for navigation dropdown
+  - **Files:**
+    - `app/views/crm/shared/_header.html.erb` - Updated with icon map
+    - `app/views/admin/shared/_header.html.erb` - Uses shared auth_button
+
+### Changed
+
+- **CRM Header Redesign**
+  - Changed from text "Delivery Booster | CRM" to icon-based design
+  - Added icon map for dynamic icon selection
+  - Kept stats and extra_links functionality
+  - **Before:** `Delivery Booster | CRM` (text-based)
+  - **After:** `[📊] Delivery Booster` + `CRM` (icon + subtitle)
+
+- **Admin Header**
+  - Replaced custom dropdown with shared `auth_button` partial
+  - Made `page_title` dynamic with default "Analytics Dashboard"
+  - **Before:** Custom dropdown with 3 items (CRM, Course, Выйти)
+  - **After:** Full dropdown with all navigation items
+
+### Technical Details
+
+**Chart.js ESM Import:**
+```ruby
+# config/importmap.rb
+pin "chart.js/auto", to: "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/auto/+esm"
+```
+
+**Icon Map Pattern:**
+```erb
+<% page_icons = {
+  'CRM' => '<path ... />',
+  'Messenger' => '<path ... />',
+  'Источники трафика' => '<path ... />',
+  'Analytics Dashboard' => '<path ... />'
+} %>
+<% icon_path = page_icons[page_title] || default_icon %>
+```
+
+**Admin Domain Routes:**
+```ruby
+# Production
+constraints(host: "admin.aidelivery.tech") do
+  get "/", to: "admin/home#index", as: :admin_root
+  namespace :admin, path: "" do
+    get "dashboard", to: "dashboard#index"
+  end
+end
+
+# Development
+get "admin", to: "admin/home#index", as: :admin_root
+namespace :admin do
+  get "dashboard", to: "dashboard#index"
+end
+```
+
+**Kamal Deployment:**
+```yaml
+proxy:
+  ssl: true
+  host: course.aidelivery.tech,crm.aidelivery.tech,admin.aidelivery.tech
+```
+
+### Access Level Matrix (Updated)
+
+| User Type | Course | CRM | Messenger | Traffic | Analytics |
+|-----------|--------|-----|-----------|---------|-----------|
+| Not authenticated | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Authenticated (free) | Partial | ✗ | ✗ | ✗ | ✗ |
+| Authenticated (paid) | ✓ | ✗ | ✗ | ✗ | ✗ |
+| Admin | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+### Documentation
+
+- **Created:** `ai_docs/development/admin_analytics_dashboard.md` - Full admin dashboard docs
+- **Updated:** `ai_docs/development/multi_domain_architecture.md` - Added admin domain
+- **Updated:** `ai_docs/development/changelog.md` - This entry
+
+### Commits
+
+- `6f4703a` - Add admin.aidelivery.tech analytics dashboard
+- `3b3b9eb` - Unify header design across CRM and Admin domains
+
+---
+
 ## [October 16, 2025] - Paid User Access Control & CRM Placeholder
 
 ### Added

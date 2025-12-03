@@ -2,33 +2,34 @@
 
 ## Обзор
 
-Приложение работает на двух субдоменах:
+Приложение работает на трёх субдоменах:
 - **course.aidelivery.tech** — основной курс для пользователей
 - **crm.aidelivery.tech** — CRM панель для администраторов
+- **admin.aidelivery.tech** — Analytics Dashboard для управления клиентами
 
-Оба домена используют **единую сессию** (Single Sign-On) через shared cookies.
+Все домены используют **единую сессию** (Single Sign-On) через shared cookies.
 
 ---
 
 ## Архитектура доменов
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    aidelivery.tech                          │
-│                                                             │
-│  ┌─────────────────────┐    ┌─────────────────────┐        │
-│  │ course.aidelivery   │    │ crm.aidelivery      │        │
-│  │     .tech           │    │     .tech           │        │
-│  │                     │    │                     │        │
-│  │  • Главная          │    │  • CRM Dashboard    │        │
-│  │  • Dashboard        │    │  • Messenger        │        │
-│  │  • Free Content     │    │  • Traffic Sources  │        │
-│  │  • Уроки            │    │  • Канбан           │        │
-│  └─────────────────────┘    └─────────────────────┘        │
-│                                                             │
-│            ▼ Shared Session Cookie ▼                        │
-│     domain=.aidelivery.tech (tld_length: 2)                │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                         aidelivery.tech                              │
+│                                                                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
+│  │   course.    │  │    crm.      │  │   admin.     │               │
+│  │ aidelivery   │  │ aidelivery   │  │ aidelivery   │               │
+│  │   .tech      │  │   .tech      │  │   .tech      │               │
+│  │              │  │              │  │              │               │
+│  │ • Главная    │  │ • CRM        │  │ • Analytics  │               │
+│  │ • Dashboard  │  │ • Messenger  │  │ • Clients    │               │
+│  │ • Free Cont. │  │ • Traffic    │  │ • AI Chat    │               │
+│  │ • Уроки      │  │ • Канбан     │  │ • Charts     │               │
+│  └──────────────┘  └──────────────┘  └──────────────┘               │
+│                                                                      │
+│              ▼ Shared Session Cookie (tld_length: 2) ▼              │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -230,7 +231,7 @@ fetch('/auth/status', { credentials: 'include' })
 # config/deploy.yml
 proxy:
   ssl: true
-  host: course.aidelivery.tech,crm.aidelivery.tech
+  host: course.aidelivery.tech,crm.aidelivery.tech,admin.aidelivery.tech
 ```
 
 Kamal-proxy автоматически маршрутизирует запросы на основе Host header.
