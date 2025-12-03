@@ -27,16 +27,36 @@ class N8nController < ApplicationController
       return
     end
 
-    # AI квалификация - принимаем параметры напрямую из N8N
+    # AI квалификация - принимаем параметры напрямую из N8N (все на верхнем уровне)
+    # Поддержка как старого формата (dbcourse), так и нового (DeliveryBooster)
     qualification_data = {
+      # Базовые поля (совместимость с dbcourse)
       real_name: params[:real_name],
       background: params[:background],
       query: params[:query],
-      ready_score: params[:ready]
+      ready_score: params[:ready_score] || params[:ready],
+
+      # DeliveryBooster расширенная квалификация (все поля на верхнем уровне)
+      restaurant_name: params[:restaurant_name],
+      platform: params[:platform],
+      orders_per_day: params[:orders_per_day],
+      rating: params[:rating],
+      uses_ads: params[:uses_ads],
+      main_problem: params[:main_problem],
+      urgency: params[:urgency],
+      is_new_brand: params[:is_new_brand],
+      location: params[:location],
+
+      # PQL и эскалация
+      is_pql: params[:is_pql],
+      action: params[:action],
+      red_flags: params[:red_flags],
+      pql_signals: params[:pql_signals]
     }
 
     Rails.logger.info "Text to send: #{text_to_send[0..100]}..."
     Rails.logger.info "AI qualification: #{qualification_data.inspect}"
+    Rails.logger.info "Action: #{params[:action]}, Is PQL: #{params[:is_pql]}"
 
     # Находим пользователя
     user = User.find_by(telegram_id: telegram_id)
@@ -55,12 +75,34 @@ class N8nController < ApplicationController
     Rails.logger.info "AI processing finished for conversation #{conversation.id}"
 
     # Сохраняем AI-квалификацию в conversation
-    conversation.update!(
+    # Базовые поля (совместимость с dbcourse)
+    update_attrs = {
       ai_real_name: qualification_data[:real_name],
       ai_background: qualification_data[:background],
       ai_query: qualification_data[:query],
       ai_ready_score: qualification_data[:ready_score]
-    )
+    }
+
+    # DeliveryBooster расширенные поля (если есть)
+    if qualification_data[:restaurant_name].present? || qualification_data[:action].present?
+      update_attrs.merge!(
+        ai_restaurant_name: qualification_data[:restaurant_name],
+        ai_platform: qualification_data[:platform],
+        ai_orders_per_day: qualification_data[:orders_per_day],
+        ai_rating: qualification_data[:rating],
+        ai_uses_ads: qualification_data[:uses_ads],
+        ai_main_problem: qualification_data[:main_problem],
+        ai_urgency: qualification_data[:urgency],
+        ai_is_new_brand: qualification_data[:is_new_brand],
+        ai_location: qualification_data[:location],
+        ai_is_pql: qualification_data[:is_pql],
+        ai_action: qualification_data[:action],
+        ai_red_flags: qualification_data[:red_flags],
+        ai_pql_signals: qualification_data[:pql_signals]
+      )
+    end
+
+    conversation.update!(update_attrs)
 
     Rails.logger.info "AI qualification saved for conversation #{conversation.id}"
 
@@ -114,10 +156,25 @@ class N8nController < ApplicationController
           last_message_at: conversation.last_message_at,
           # AI Qualification данные для real-time обновления sidebar
           ai_qualification: {
+            # Базовые поля
             real_name: conversation.ai_real_name,
             background: conversation.ai_background,
             query: conversation.ai_query,
-            ready_score: conversation.ai_ready_score
+            ready_score: conversation.ai_ready_score,
+            # DeliveryBooster расширенные поля
+            restaurant_name: conversation.ai_restaurant_name,
+            platform: conversation.ai_platform,
+            orders_per_day: conversation.ai_orders_per_day,
+            rating: conversation.ai_rating,
+            uses_ads: conversation.ai_uses_ads,
+            main_problem: conversation.ai_main_problem,
+            urgency: conversation.ai_urgency,
+            is_new_brand: conversation.ai_is_new_brand,
+            location: conversation.ai_location,
+            is_pql: conversation.ai_is_pql,
+            action: conversation.ai_action,
+            red_flags: conversation.ai_red_flags,
+            pql_signals: conversation.ai_pql_signals
           },
           # Статистика сообщений
           statistics: {
@@ -183,10 +240,25 @@ class N8nController < ApplicationController
               unread_count: conversation.unread_count,
               last_message_at: conversation.last_message_at,
               ai_qualification: {
+                # Базовые поля
                 real_name: conversation.ai_real_name,
                 background: conversation.ai_background,
                 query: conversation.ai_query,
-                ready_score: conversation.ai_ready_score
+                ready_score: conversation.ai_ready_score,
+                # DeliveryBooster расширенные поля
+                restaurant_name: conversation.ai_restaurant_name,
+                platform: conversation.ai_platform,
+                orders_per_day: conversation.ai_orders_per_day,
+                rating: conversation.ai_rating,
+                uses_ads: conversation.ai_uses_ads,
+                main_problem: conversation.ai_main_problem,
+                urgency: conversation.ai_urgency,
+                is_new_brand: conversation.ai_is_new_brand,
+                location: conversation.ai_location,
+                is_pql: conversation.ai_is_pql,
+                action: conversation.ai_action,
+                red_flags: conversation.ai_red_flags,
+                pql_signals: conversation.ai_pql_signals
               },
               statistics: {
                 total_messages: conversation.messages.count,

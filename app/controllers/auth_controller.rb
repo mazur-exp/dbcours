@@ -109,8 +109,11 @@ class AuthController < ApplicationController
 
     # Редиректим на правильный домен в зависимости от источника запроса
     if Rails.env.production?
-      if request.host == "crm.aidelivery.tech"
+      case request.host
+      when "crm.aidelivery.tech"
         redirect_to "https://crm.aidelivery.tech/", notice: "Вы успешно вышли из системы"
+      when "admin.aidelivery.tech"
+        redirect_to "https://admin.aidelivery.tech/", notice: "Вы успешно вышли из системы"
       else
         redirect_to "https://course.aidelivery.tech/freecontent", notice: "Вы успешно вышли из системы"
       end
@@ -552,8 +555,9 @@ class AuthController < ApplicationController
       uri = URI(N8N_WEBHOOK_URL)
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = true
-      http.open_timeout = 5
-      http.read_timeout = 5
+      http.verify_mode = OpenSSL::SSL::VERIFY_NONE  # Skip SSL verification (n8n self-signed cert)
+      http.open_timeout = 10
+      http.read_timeout = 30  # LLM может думать долго
 
       request = Net::HTTP::Post.new(uri.path)
       request['Authorization'] = "Bearer #{N8N_API_TOKEN}" if N8N_API_TOKEN.present?

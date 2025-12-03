@@ -1,4 +1,4 @@
-<%= form_with(model: traffic_source, class: "space-y-6") do |form| %>
+<%= form_with(model: traffic_source, url: traffic_source.persisted? ? crm_traffic_source_path(traffic_source) : crm_traffic_sources_path, class: "space-y-6") do |form| %>
   <% if traffic_source.errors.any? %>
     <div class="bg-red-50 border border-red-200 rounded-lg p-4">
       <h3 class="text-red-800 font-semibold">Ошибки:</h3>
