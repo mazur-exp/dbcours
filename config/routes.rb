@@ -18,6 +18,11 @@ Rails.application.routes.draw do
   # N8N API
   post "api/n8n/send_message", to: "n8n#send_message", as: :n8n_send_message
 
+  # AI Chat API (Admin Dashboard → N8N → Claude)
+  namespace :api do
+    post "ai_chat/analyze", to: "ai_chat#analyze"
+  end
+
   # Short links - public, work on both domains
   get "s/:code", to: "short_links#redirect", as: :short_link
 
