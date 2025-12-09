@@ -31,6 +31,7 @@ module Api
 
       begin
         response = send_to_n8n(payload)
+        Rails.logger.info "N8N Response: #{response.code} - Body length: #{response.body&.length || 0} bytes"
 
         if response.is_a?(Net::HTTPSuccess)
           # Handle empty response from N8N

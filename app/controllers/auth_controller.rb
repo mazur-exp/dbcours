@@ -1,7 +1,7 @@
 require 'telegram/bot'
 
 class AuthController < ApplicationController
-  skip_before_action :verify_authenticity_token, only: [:webhook]
+  skip_before_action :verify_authenticity_token, only: [:webhook, :start]
   before_action :cleanup_stale_session, only: [:start]
 
   # Генерирует session_token и возвращает Telegram deep link

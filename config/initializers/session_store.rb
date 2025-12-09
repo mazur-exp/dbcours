@@ -11,8 +11,8 @@
 # aidelivery.tech has 2 parts, so tld_length must be 2
 Rails.application.config.session_store :cookie_store,
   key: "_dbcours_session",
-  domain: :all,
-  tld_length: 2,
+  domain: Rails.env.development? ? nil : :all,  # nil для ngrok в development
+  tld_length: Rails.env.development? ? nil : 2,  # nil для ngrok в development
   secure: Rails.env.production?,
   httponly: true,
   same_site: :lax
