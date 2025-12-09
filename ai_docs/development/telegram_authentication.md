@@ -46,7 +46,7 @@ delete '/auth/logout', to: 'auth#logout'
 
 ```ruby
 class AuthController < ApplicationController
-  skip_before_action :verify_authenticity_token, only: [:telegram_webhook]
+  skip_before_action :verify_authenticity_token, only: [:webhook, :start]
 
   # POST /auth/telegram/start
   def telegram_start

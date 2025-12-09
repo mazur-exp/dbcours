@@ -6,6 +6,47 @@ This document tracks all significant changes, features, and updates to the Bali 
 
 ---
 
+## [December 9, 2025] - ngrok Development Environment Fixes
+
+### Fixed
+
+- **Telegram Authentication через ngrok**
+  - Skip CSRF verification для `/auth/telegram/start` endpoint
+  - Исправлен session domain для development окружения (nil вместо :all)
+  - Telegram авторизация теперь работает через ngrok tunnel
+  - **Files:**
+    - `app/controllers/auth_controller.rb:4` - добавлен `:start` в skip_before_action
+    - `config/initializers/session_store.rb:14-15` - условный domain для development
+
+- **ActionCable Static Subscription Conflict**
+  - Удалена статическая подписка на AuthChannel без session_token
+  - Динамическая подписка с токеном уже реализована в auth_controller.js
+  - **Files:**
+    - `app/javascript/channels/auth_channel.js` - очищен файл
+
+- **Production AI Chat Configuration**
+  - Добавлен `ai_chat_webhook_url` в production credentials для AI assistant
+  - **Files:**
+    - `config/credentials/production.yml.enc` - добавлен n8n.ai_chat_webhook_url.production
+
+### Changed
+
+- **AI Chat Controller Logging**
+  - Добавлен debug logging для N8N responses
+  - Помогает диагностировать empty response issues
+  - **Files:**
+    - `app/controllers/api/ai_chat_controller.rb:34` - логирование response code и body length
+
+### Technical Details
+
+**Problem:** ngrok домен `karri-unexpunged-becomingly.ngrok-free.dev` имеет 4 части, но session store настроен для 2-х частных доменов (`*.aidelivery.tech`). Session cookies не устанавливались правильно в development, блокируя CSRF и авторизацию.
+
+**Solution:** Conditional session configuration - `domain: nil` в development позволяет cookies работать на любом домене (включая ngrok), при этом production shared session остаётся без изменений.
+
+**Impact:** Telegram авторизация теперь работает в development через ngrok для локального тестирования webhook integrations.
+
+---
+
 ## [December 3, 2025] - Admin Analytics Dashboard & Unified Header Design
 
 ### Added

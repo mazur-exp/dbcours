@@ -909,6 +909,87 @@ set-cookie: _dbcours_session=...; domain=.aidelivery.tech; path=/; secure; httpo
 
 ---
 
+## Issue #13: ngrok Development Environment Authentication Fails
+
+### Problem
+
+**Symptom:**
+- Telegram authentication fails in development when using ngrok
+- POST /auth/telegram/start returns 422 Invalid Authenticity Token
+- Session cookies not persisting between requests
+- User authenticated in Telegram but browser remains logged out
+
+**Root Cause:**
+- Session store configured with `tld_length: 2` for `.aidelivery.tech` (2-part domain)
+- ngrok domain `karri-unexpunged-becomingly.ngrok-free.dev` has 4 parts
+- Rails calculates incorrect cookie domain for ngrok
+- Session cookies fail to set → CSRF verification fails → authentication broken
+
+**Discovery Method:**
+```bash
+# Rails logs show:
+ActionController::InvalidAuthenticityToken in AuthController#start
+Can't verify CSRF token authenticity.
+
+# Chrome DevTools → Application → Cookies shows no _dbcours_session cookie
+```
+
+---
+
+### Solution
+
+**Part 1: Skip CSRF for /auth/telegram/start**
+
+**File:** `app/controllers/auth_controller.rb:4`
+```ruby
+skip_before_action :verify_authenticity_token, only: [:webhook, :start]
+```
+
+**Reasoning:**
+- `/start` endpoint only generates session_token (no data modification)
+- Safe to skip CSRF as method has no side effects
+- Similar to existing `:webhook` skip
+
+**Part 2: Fix Session Domain for Development**
+
+**File:** `config/initializers/session_store.rb:14-15`
+```ruby
+Rails.application.config.session_store :cookie_store,
+  key: "_dbcours_session",
+  domain: Rails.env.development? ? nil : :all,  # nil for ngrok in development
+  tld_length: Rails.env.development? ? nil : 2,  # nil for ngrok in development
+  secure: Rails.env.production?,
+  httponly: true,
+  same_site: :lax
+```
+
+**Why it Works:**
+- Development: `domain: nil` → cookies set for current domain (ngrok)
+- Production: `domain: :all, tld_length: 2` → shared session across `*.aidelivery.tech` subdomains ✅
+- Production shared session NOT affected by change
+
+**Part 3: Remove Conflicting Static AuthChannel Subscription**
+
+**File:** `app/javascript/channels/auth_channel.js`
+```javascript
+// This file is intentionally empty
+// Auth channel subscription is handled dynamically in auth_controller.js
+// with session_token parameter for proper authentication flow
+```
+
+**Why it Was Removed:**
+- Static subscription created without session_token parameter
+- Rails AuthChannel requires session_token → rejects subscription
+- Dynamic subscription in auth_controller.js already handles auth correctly
+
+**Result:**
+- ✅ Telegram authentication works through ngrok
+- ✅ Session cookies persist properly
+- ✅ Production shared session unaffected
+- ✅ ActionCable delivers auth broadcasts correctly
+
+---
+
 ## Known Limitations (Not Issues)
 
 ### SQLite Concurrency

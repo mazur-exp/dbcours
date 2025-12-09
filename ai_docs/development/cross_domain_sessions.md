@@ -40,12 +40,17 @@
 ```ruby
 Rails.application.config.session_store :cookie_store,
   key: "_dbcours_session",
-  domain: :all,           # Автоматически вычисляет домен
-  tld_length: 2,          # КРИТИЧНО для .tech доменов!
+  domain: Rails.env.development? ? nil : :all,  # nil для ngrok в development
+  tld_length: Rails.env.development? ? nil : 2,  # КРИТИЧНО для .tech доменов!
   secure: Rails.env.production?,
   httponly: true,
   same_site: :lax
 ```
+
+**Важно для development:**
+- `domain: nil` позволяет cookies работать на ngrok домене
+- ngrok URL вида `xxx-yyy-zzz.ngrok-free.dev` имеет 4 части (не 2!)
+- `tld_length: 2` рассчитан только для production (`*.aidelivery.tech`)
 
 ### Параметры cookie
 
