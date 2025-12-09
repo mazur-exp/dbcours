@@ -1,10 +1,22 @@
 import { Controller } from "@hotwired/stimulus"
+import consumer from "channels/consumer"
 
 // AI Chat controller for admin dashboard
-// Sends questions to N8N webhook for Claude analysis
+// Sends questions to N8N webhook for Claude analysis (async via ActionCable)
 export default class extends Controller {
   static targets = ["input", "messages", "sendButton"]
   static values = { clientId: Number }
+
+  connect() {
+    this.subscription = null
+    this.currentLoadingEl = null
+  }
+
+  disconnect() {
+    if (this.subscription) {
+      this.subscription.unsubscribe()
+    }
+  }
 
   handleKeydown(event) {
     if (event.key === "Enter" && !event.shiftKey) {
@@ -25,7 +37,7 @@ export default class extends Controller {
     this.inputTarget.value = ""
 
     // Show typing indicator
-    const loadingEl = this.showTypingIndicator()
+    this.currentLoadingEl = this.showTypingIndicator()
 
     try {
       const response = await fetch("/api/ai_chat/analyze", {
@@ -42,21 +54,52 @@ export default class extends Controller {
 
       const data = await response.json()
 
-      // Remove typing indicator
-      this.removeTypingIndicator(loadingEl)
-
-      if (data.success) {
-        this.appendMessage("ai", data.analysis)
+      if (data.success && data.session_id) {
+        // Подписываемся на ActionCable для получения результата
+        this.subscribeToAiChatChannel(data.session_id)
       } else {
-        this.appendMessage("error", data.error || "Произошла ошибка")
+        this.removeTypingIndicator(this.currentLoadingEl)
+        this.appendMessage("error", data.error || "Ошибка отправки запроса")
+        this.setLoading(false)
       }
     } catch (error) {
       console.error("AI Chat error:", error)
-      this.removeTypingIndicator(loadingEl)
+      this.removeTypingIndicator(this.currentLoadingEl)
       this.appendMessage("error", "Ошибка соединения. Попробуйте снова.")
-    } finally {
       this.setLoading(false)
     }
+  }
+
+  subscribeToAiChatChannel(sessionId) {
+    // Отписываемся от предыдущего канала если есть
+    if (this.subscription) {
+      this.subscription.unsubscribe()
+    }
+
+    this.subscription = consumer.subscriptions.create(
+      { channel: "AiChatChannel", session_id: sessionId },
+      {
+        received: (data) => {
+          if (data.type === "analysis_complete") {
+            // Убираем typing indicator
+            this.removeTypingIndicator(this.currentLoadingEl)
+            this.setLoading(false)
+
+            if (data.success) {
+              this.appendMessage("ai", data.analysis)
+            } else {
+              this.appendMessage("error", data.error || "Ошибка анализа")
+            }
+
+            // Отписываемся после получения результата
+            if (this.subscription) {
+              this.subscription.unsubscribe()
+              this.subscription = null
+            }
+          }
+        }
+      }
+    )
   }
 
   setLoading(isLoading) {
