@@ -990,6 +990,149 @@ Rails.application.config.session_store :cookie_store,
 
 ---
 
+## Issue #14: kamal-proxy 30-Second Timeout Blocks AI Chat
+
+### Problem
+
+**Symptom:**
+- AI Chat requests timeout after exactly 30 seconds
+- Error: 502 Bad Gateway "context canceled"
+- Claude analysis takes 50-90 seconds but never completes
+- N8N successfully returns response but browser never receives it
+
+**Root Cause:**
+- kamal-proxy has **hardcoded 30-second response timeout**
+- Cannot be configured via deploy.yml or environment variables
+- Rails `read_timeout: 120s` works fine
+- N8N returns response successfully (200 OK)
+- But kamal-proxy cancels client connection after 30s → browser gets 502
+
+**Discovery Method:**
+```bash
+# Production logs show:
+{"msg":"Unable to proxy request","path":"/api/ai_chat/analyze","error":"context canceled"}
+{"status":502,"dur":30014,...}  # Exactly 30 seconds!
+
+# But Rails receives response:
+N8N Response: 200 - Body length: 5820 bytes
+```
+
+**Tested Solutions (FAILED):**
+- ❌ `proxy.response_timeout: 150` in deploy.yml → ignored
+- ❌ `THRUSTER_HTTP_IDLE_TIMEOUT: 150s` → wrong component
+- ❌ `THRUSTER_HTTP_READ_TIMEOUT: 150s` → kamal-proxy doesn't use Thruster timeouts
+- ❌ `proxy reboot`, `proxy remove/boot`, `kamal deploy` → timeout persists
+
+---
+
+### Solution
+
+**Async Processing via ActionCable + Solid Queue:**
+
+**Architecture:**
+```
+Browser → POST /api/ai_chat/analyze (instant response)
+             ↓
+        Solid Queue Job (background)
+             ↓
+        N8N → Claude (60-90 sec, no timeout)
+             ↓
+   ActionCable broadcast → Browser (WebSocket)
+```
+
+**Implementation:**
+
+**1. Background Job** (`app/jobs/ai_chat_analysis_job.rb`):
+```ruby
+class AiChatAnalysisJob < ApplicationJob
+  def perform(session_id, question, client_id, user_id)
+    response = send_to_n8n(payload)
+
+    # Parse response (supports JSON and plain text)
+    begin
+      data = JSON.parse(response.body)
+      data = data.first if data.is_a?(Array)
+      analysis = data["output"] || data["analysis"] || data.to_s
+    rescue JSON::ParserError
+      analysis = response.body  # Plain text fallback
+    end
+
+    # Deliver via ActionCable
+    ActionCable.server.broadcast(
+      "ai_chat_channel_#{session_id}",
+      { type: "analysis_complete", success: true, analysis: analysis }
+    )
+  end
+end
+```
+
+**2. ActionCable Channel** (`app/channels/ai_chat_channel.rb`):
+```ruby
+class AiChatChannel < ApplicationCable::Channel
+  def subscribed
+    stream_from "ai_chat_channel_#{params[:session_id]}"
+  end
+end
+```
+
+**3. Controller** (`app/controllers/api/ai_chat_controller.rb`):
+```ruby
+def analyze
+  # Queue job immediately (no waiting)
+  AiChatAnalysisJob.perform_later(
+    session.id.to_s,
+    params[:question],
+    params[:client_id],
+    @current_user&.id
+  )
+
+  # Return success instantly
+  render json: { success: true, session_id: session.id.to_s }
+end
+```
+
+**4. Frontend** (`app/javascript/controllers/admin_chat_controller.js`):
+```javascript
+async send() {
+  const response = await fetch("/api/ai_chat/analyze", {...})
+  const data = await response.json()
+
+  if (data.success && data.session_id) {
+    // Subscribe to ActionCable for async result
+    this.subscribeToAiChatChannel(data.session_id)
+  }
+}
+
+subscribeToAiChatChannel(sessionId) {
+  this.subscription = consumer.subscriptions.create(
+    { channel: "AiChatChannel", session_id: sessionId },
+    {
+      received: (data) => {
+        if (data.type === "analysis_complete") {
+          this.appendMessage("ai", data.analysis)
+          this.subscription.unsubscribe()
+        }
+      }
+    }
+  )
+}
+```
+
+**Benefits:**
+- ✅ No kamal-proxy timeout (job runs in background)
+- ✅ Instant feedback to user ("Анализирую...")
+- ✅ Supports any analysis duration (60s, 120s, 180s)
+- ✅ Scalable (multiple concurrent analyses)
+- ✅ Solid Queue handles retries and failures
+- ✅ Works identically in development and production
+
+**Result:**
+- AI Chat works reliably in production with Claude responses
+- Same async pattern as Telegram authentication
+- No dependency on proxy timeouts
+
+---
+
 ## Known Limitations (Not Issues)
 
 ### SQLite Concurrency

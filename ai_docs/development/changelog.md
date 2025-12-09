@@ -6,7 +6,23 @@ This document tracks all significant changes, features, and updates to the Bali 
 
 ---
 
-## [December 9, 2025] - ngrok Development Environment Fixes
+## [December 9, 2025] - ngrok Development Fixes & Async AI Chat
+
+### Added
+
+- **Async AI Chat via ActionCable + Solid Queue**
+  - AI Chat теперь работает асинхронно (обходит kamal-proxy 30-сек timeout)
+  - Мгновенный response браузеру, результат через WebSocket
+  - Поддержка любой длительности анализа (60s, 120s, 180s+)
+  - **Files:**
+    - `app/jobs/ai_chat_analysis_job.rb` - фоновая обработка N8N запросов
+    - `app/channels/ai_chat_channel.rb` - WebSocket канал для результатов
+  - **Modified:**
+    - `app/controllers/api/ai_chat_controller.rb` - запуск job вместо sync request
+    - `app/javascript/controllers/admin_chat_controller.js` - подписка на ActionCable
+  - **Documentation:** `ai_docs/development/known_issues_and_solutions.md` (Issue #14)
+
+### Fixed (ngrok Development Environment)
 
 ### Fixed
 

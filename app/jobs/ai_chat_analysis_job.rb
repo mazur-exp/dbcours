@@ -15,9 +15,15 @@ class AiChatAnalysisJob < ApplicationJob
       response = send_to_n8n(payload)
 
       if response.is_a?(Net::HTTPSuccess)
-        data = JSON.parse(response.body)
-        data = data.first if data.is_a?(Array) && data.any?
-        analysis = data["analysis"] || data["content"] || data["message"] || data["output"] || data.to_s
+        # Try to parse as JSON, fallback to plain text
+        begin
+          data = JSON.parse(response.body)
+          data = data.first if data.is_a?(Array) && data.any?
+          analysis = data["analysis"] || data["content"] || data["message"] || data["output"] || data.to_s
+        rescue JSON::ParserError
+          # N8N returned plain text/markdown, not JSON
+          analysis = response.body
+        end
 
         # Отправляем результат через ActionCable
         ActionCable.server.broadcast(
