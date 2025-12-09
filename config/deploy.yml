@@ -45,8 +45,10 @@ env:
     # When you start using multiple servers, you should split out job processing to a dedicated machine.
     SOLID_QUEUE_IN_PUMA: true
 
-    # Thruster proxy timeout for AI Chat (Claude может думать 1-2 минуты)
+    # Thruster proxy timeouts for AI Chat (Claude может думать 1-2 минуты)
     THRUSTER_HTTP_IDLE_TIMEOUT: 150s
+    THRUSTER_HTTP_READ_TIMEOUT: 150s
+    THRUSTER_HTTP_WRITE_TIMEOUT: 150s
 
     # Set number of processes dedicated to Solid Queue (default: 1)
     # JOB_CONCURRENCY: 3
