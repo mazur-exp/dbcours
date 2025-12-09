@@ -24,6 +24,7 @@ servers:
 proxy:
   ssl: true
   host: course.aidelivery.tech,crm.aidelivery.tech,admin.aidelivery.tech
+  response_timeout: 150  # 150 секунд для AI Chat (Claude думает 60-90 сек)
 
 # Credentials for your image host.
 registry:
