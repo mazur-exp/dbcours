@@ -47,7 +47,13 @@ module Api
           # Try to parse as JSON, fallback to plain text
           begin
             data = JSON.parse(response.body)
+
+            # N8N может вернуть массив [{"output": "..."}] или объект {"output": "..."}
+            data = data.first if data.is_a?(Array) && data.any?
+
+            # Извлекаем analysis из любого возможного ключа
             analysis = data["analysis"] || data["content"] || data["message"] || data["output"] || data.to_s
+
             metadata = {
               restaurant: data["restaurant"],
               period: data["period"],
