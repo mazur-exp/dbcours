@@ -1,0 +1,24 @@
+<div class="bg-white rounded-lg shadow p-4">
+  <h3 class="font-semibold mb-2 flex items-center gap-2">
+    <span>📊</span>
+    <span>Сбор данных Grab/GoJek</span>
+  </h3>
+  <p class="text-xs text-gray-600 mb-3">
+    Собирает свежие данные из API и сохраняет напрямую в базу
+  </p>
+
+  <%= button_to "Собрать данные",
+      admin_collect_data_path,
+      method: :post,
+      class: "w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium",
+      data: { confirm: "Запустить сбор данных? Займет ~10-15 минут." } %>
+
+  <div class="text-xs text-gray-500 mt-3 space-y-1">
+    <p>📅 Последнее обновление: <%= @last_sync&.strftime("%d.%m.%Y %H:%M") || "Никогда" %></p>
+    <p>📊 Записей в базе: <%= number_with_delimiter(ClientStat.count) %></p>
+    <% if ClientStat.any? %>
+      <p>📆 Период данных: <%= ClientStat.minimum(:stat_date)&.strftime("%d.%m.%Y") %> — <%= ClientStat.maximum(:stat_date)&.strftime("%d.%m.%Y") %></p>
+    <% end %>
+    <p class="text-green-600">⚡ Автоматически каждый день в 8:30 AM (Bali)</p>
+  </div>
+</div>

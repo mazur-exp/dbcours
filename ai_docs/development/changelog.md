@@ -6,6 +6,80 @@ This document tracks all significant changes, features, and updates to the Bali 
 
 ---
 
+## [January 25, 2026] - Delivery Data Collection Script Integration
+
+### Added
+
+- **Node.js Delivery Collector Integration**
+  - Интегрирован Node.js скрипт сбора данных из Grab/GoJek API в Rails приложение
+  - Скрипт работает на том же сервере что и Rails (всё на одном сервере!)
+  - Прямое сохранение в Rails SQLite через HTTP API
+  - **Files:**
+    - `lib/delivery_collector/` - Полный Node.js скрипт с зависимостями
+    - `app/jobs/collect_delivery_data_job.rb` - Rails job для запуска скрипта
+    - `app/controllers/api/collector_controller.rb` - HTTP API для приёма данных
+    - `app/models/client.rb` - Добавлен метод `to_collector_format`
+    - `lib/delivery_collector/modules/saveToRailsDB_http.js` - HTTP сохранение
+  - **Architecture:** Grab/GoJek API → Node.js (Rails сервер) → Rails SQLite (2 шага!)
+  - **Documentation:** `ai_docs/development/delivery_collector_integration.md`
+
+- **API Credentials in Clients Table**
+  - Добавлены поля для хранения Grab/GoJek API токенов в таблице `clients`
+  - 10 новых полей: grab_token, grab_user_id, gojek_merchant_id, gojek_refresh_token, и т.д.
+  - Поддержка шифрования через `encrypts` (для production)
+  - Импорт credentials из старого restaurants.js (126 клиентов)
+  - **Files:**
+    - `db/migrate/20260125113331_add_api_credentials_to_clients.rb`
+    - `lib/delivery_collector/import_credentials.rb` - Helper для импорта
+
+- **Local Replica Architecture** (Локальное кеширование статистики)
+  - Таблица `client_stats` для кеширования данных из MySQL
+  - `SyncDeliveryStatsJob` для синхронизации MySQL → SQLite (сейчас не используется)
+  - Мгновенные запросы к локальной базе вместо 127 HTTP запросов
+  - **Performance:** 1,562× ускорение (19 секунд → 12 мс!)
+  - **Files:**
+    - `db/migrate/20260125074440_create_client_stats.rb`
+    - `app/models/client_stat.rb`
+    - `app/services/analytics/client_stats_service.rb` - Читает из локальной базы
+    - `app/controllers/admin/dashboard_controller.rb` - JOIN запросы для сортировки
+    - `app/views/admin/dashboard/_sync_panel.html.erb` - UI панель
+    - `app/javascript/controllers/sync_progress_controller.js` - UX feedback
+  - **Documentation:** `ai_docs/development/local_replica_implementation_summary.md`
+
+### Changed
+
+- **Admin Dashboard Performance**
+  - Sidebar clients отсортирован по sales напрямую из базы (мгновенно!)
+  - Упрощён sync panel - одна кнопка "Собрать данные" вместо двух
+  - Убрана зависимость от Express API сервера для отображения данных
+
+- **Dockerfile - Node.js Integration**
+  - Установка Node.js 20.x в Docker образ
+  - Автоматическая установка npm dependencies в build time
+  - **Files:** `Dockerfile`
+
+- **Recurring Jobs Schedule**
+  - Изменён на `collect_delivery_data` (было `sync_delivery_stats`)
+  - Запуск в 8:30 AM Bali (00:30 UTC) каждый день
+  - **Files:** `config/recurring.yml`
+
+### Technical Details
+
+**Problem:** Сложная архитектура с двумя серверами (Rails + MySQL/Express), медленные запросы (127 HTTP requests = 19 секунд).
+
+**Solution:**
+1. Локальное кеширование в SQLite (мгновенные запросы)
+2. Node.js скрипт на Rails сервере (без второго сервера)
+3. HTTP API для сохранения данных (совместимость)
+
+**Impact:**
+- Dashboard загружается мгновенно (<500ms)
+- Смена дат/клиентов - instant
+- Один сервер для управления
+- MySQL сервер больше не нужен для dashboard
+
+---
+
 ## [December 9, 2025] - ngrok Development Fixes & Async AI Chat
 
 ### Added

@@ -32,4 +32,17 @@ module ApplicationHelper
       end
     end
   end
+
+  def format_currency(amount)
+    return "Rp 0" if amount.nil? || amount.zero?
+
+    # Format as Indonesian Rupiah
+    if amount >= 1_000_000
+      "Rp #{(amount / 1_000_000.0).round(1)}M"
+    elsif amount >= 1_000
+      "Rp #{(amount / 1_000.0).round(1)}K"
+    else
+      "Rp #{amount.round(0)}"
+    end
+  end
 end

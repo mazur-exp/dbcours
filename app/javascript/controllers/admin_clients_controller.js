@@ -1,7 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 
 // Admin Clients controller for filtering client list
-// Provides real-time search/filter functionality in the sidebar
 export default class extends Controller {
   static targets = ["search", "list"]
 

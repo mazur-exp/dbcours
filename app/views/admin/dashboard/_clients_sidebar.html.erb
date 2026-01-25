@@ -1,4 +1,4 @@
-<aside class="w-64 bg-white border-r border-gray-200 flex flex-col">
+<aside class="w-64 bg-white border-r border-gray-200 flex flex-col" data-controller="admin-clients">
   <!-- Header -->
   <div class="p-4 border-b border-gray-200">
     <h2 class="text-lg font-semibold text-gray-900 mb-3">Клиенты</h2>
@@ -24,6 +24,7 @@
       <% clients.each do |client| %>
         <a
           href="<%= admin_dashboard_path(client_id: client.id) %>"
+          data-client-id="<%= client.id %>"
           data-client-name="<%= client.name.downcase %>"
           class="block px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors <%= 'bg-green-50 border-l-4 border-l-green-500' if selected_client&.id == client.id %>"
         >
@@ -32,13 +33,9 @@
               <%= client.name.first.upcase %>
             </div>
             <div class="flex-1 min-w-0">
-              <p class="font-medium text-gray-900 truncate"><%= client.name %></p>
-              <p class="text-xs text-gray-500">
-                <% if client.start_date.present? %>
-                  с <%= client.start_date.strftime("%d.%m.%Y") %>
-                <% else %>
-                  Нет даты начала
-                <% end %>
+              <p class="font-medium text-gray-900 truncate text-sm"><%= client.name %></p>
+              <p class="text-xs <%= client.period_sales.to_f > 0 ? 'text-green-600 font-semibold' : 'text-gray-400' %>">
+                <%= format_currency(client.period_sales.to_f) %>
               </p>
             </div>
             <% if client.status != 'active' %>

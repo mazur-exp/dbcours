@@ -21,6 +21,7 @@ Rails.application.routes.draw do
   # AI Chat API (Admin Dashboard → N8N → Claude)
   namespace :api do
     post "ai_chat/analyze", to: "ai_chat#analyze"
+    post "collector/save_stats", to: "collector#save_stats"
   end
 
   # Short links - public, work on both domains
@@ -38,6 +39,9 @@ Rails.application.routes.draw do
 
       namespace :admin, path: "" do
         get "dashboard", to: "dashboard#index", as: :dashboard
+        post "sync_stats", to: "sync#sync_stats"
+        post "collect_data", to: "sync#collect_data"
+        get "sync_status", to: "sync#status"
       end
     end
 
@@ -60,6 +64,9 @@ Rails.application.routes.draw do
     get "admin_login", to: "admin/home#index", as: :admin_root
     namespace :admin, path: "admin" do
       get "dashboard", to: "dashboard#index", as: :dashboard
+      post "sync_stats", to: "sync#sync_stats"
+      post "collect_data", to: "sync#collect_data"
+      get "sync_status", to: "sync#status"
     end
   end
 

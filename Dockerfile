@@ -28,9 +28,15 @@ ENV RAILS_ENV="production" \
 # Throw-away build stage to reduce size of final image
 FROM base AS build
 
-# Install packages needed to build gems
+# Install packages needed to build gems and Node.js
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y build-essential git libyaml-dev pkg-config && \
+    apt-get install --no-install-recommends -y build-essential git libyaml-dev pkg-config curl && \
+    rm -rf /var/lib/apt/lists /var/cache/apt/archives
+
+# Install Node.js 20.x for delivery data collection script
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    node --version && npm --version && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 # Install application gems
@@ -44,6 +50,13 @@ COPY . .
 
 # Precompile bootsnap code for faster boot times
 RUN bundle exec bootsnap precompile app/ lib/
+
+# Install Node.js dependencies for delivery collector
+RUN if [ -d /rails/lib/delivery_collector ]; then \
+      cd /rails/lib/delivery_collector && \
+      npm install --production --ignore-scripts && \
+      echo "Delivery collector dependencies installed"; \
+    fi
 
 # Precompiling assets for production without requiring secret RAILS_MASTER_KEY
 RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile

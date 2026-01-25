@@ -1,9 +1,42 @@
 <div class="flex-1 p-6 overflow-y-auto bg-gray-50">
   <% if selected_client %>
-    <!-- Client name header -->
-    <div class="mb-6">
-      <h2 class="text-2xl font-bold text-gray-900"><%= selected_client.name %></h2>
-      <p class="text-gray-500 text-sm">Аналитика клиента</p>
+    <!-- Client name header with date picker -->
+    <div class="mb-6 flex items-center justify-between">
+      <div>
+        <h2 class="text-2xl font-bold text-gray-900"><%= selected_client.name %></h2>
+        <p class="text-gray-500 text-sm">Аналитика клиента</p>
+      </div>
+
+      <!-- Date Range Picker -->
+      <div class="flex items-center gap-3">
+        <form action="<%= admin_dashboard_path %>" method="get" class="flex items-center gap-2">
+          <input type="hidden" name="client_id" value="<%= selected_client.id %>">
+
+          <div class="flex items-center gap-2">
+            <label class="text-sm text-gray-600">Период:</label>
+            <input
+              type="date"
+              name="start_date"
+              value="<%= @start_date.to_s %>"
+              class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            >
+            <span class="text-gray-400">—</span>
+            <input
+              type="date"
+              name="end_date"
+              value="<%= @end_date.to_s %>"
+              class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            >
+          </div>
+
+          <button
+            type="submit"
+            class="px-4 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            Применить
+          </button>
+        </form>
+      </div>
     </div>
 
     <!-- Stats cards -->
@@ -16,7 +49,7 @@
             </svg>
           </div>
           <div>
-            <p class="text-2xl font-bold text-gray-900">0</p>
+            <p class="text-2xl font-bold text-gray-900"><%= number_with_delimiter(@analytics[:summary][:total_orders]) %></p>
             <p class="text-xs text-gray-500">Заказов</p>
           </div>
         </div>
@@ -30,7 +63,7 @@
             </svg>
           </div>
           <div>
-            <p class="text-2xl font-bold text-gray-900">$0</p>
+            <p class="text-2xl font-bold text-gray-900"><%= @analytics[:summary][:total_sales] %></p>
             <p class="text-xs text-gray-500">Выручка</p>
           </div>
         </div>
@@ -44,7 +77,7 @@
             </svg>
           </div>
           <div>
-            <p class="text-2xl font-bold text-gray-900">0</p>
+            <p class="text-2xl font-bold text-gray-900"><%= number_with_delimiter(@analytics[:summary][:total_customers]) %></p>
             <p class="text-xs text-gray-500">Клиентов</p>
           </div>
         </div>
@@ -58,12 +91,24 @@
             </svg>
           </div>
           <div>
-            <p class="text-2xl font-bold text-gray-900">0.0</p>
+            <p class="text-2xl font-bold text-gray-900"><%= number_with_precision(@analytics[:summary][:avg_rating], precision: 1) %></p>
             <p class="text-xs text-gray-500">Рейтинг</p>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Data status indicator -->
+    <% if !@analytics[:has_data] %>
+      <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+        <div class="flex items-center gap-2">
+          <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <p class="text-sm text-yellow-800">Для этого клиента пока нет данных в системе Delivery Stats</p>
+        </div>
+      </div>
+    <% end %>
 
     <!-- Charts grid -->
     <div class="grid grid-cols-2 gap-4">
@@ -75,8 +120,8 @@
             id="orders-chart"
             data-controller="chart"
             data-chart-type-value="line"
-            data-chart-labels-value="<%= analytics[:orders][:labels].to_json %>"
-            data-chart-data-value="<%= analytics[:orders][:data].to_json %>"
+            data-chart-labels-value="<%= @analytics[:charts][:orders][:labels].to_json %>"
+            data-chart-data-value="<%= @analytics[:charts][:orders][:data].to_json %>"
           ></canvas>
         </div>
       </div>
@@ -89,8 +134,8 @@
             id="revenue-chart"
             data-controller="chart"
             data-chart-type-value="line"
-            data-chart-labels-value="<%= analytics[:revenue][:labels].to_json %>"
-            data-chart-data-value="<%= analytics[:revenue][:data].to_json %>"
+            data-chart-labels-value="<%= @analytics[:charts][:revenue][:labels].to_json %>"
+            data-chart-data-value="<%= @analytics[:charts][:revenue][:data].to_json %>"
           ></canvas>
         </div>
       </div>
@@ -103,8 +148,8 @@
             id="customers-chart"
             data-controller="chart"
             data-chart-type-value="bar"
-            data-chart-labels-value="<%= analytics[:customers][:labels].to_json %>"
-            data-chart-data-value="<%= analytics[:customers][:data].to_json %>"
+            data-chart-labels-value="<%= @analytics[:charts][:customers][:labels].to_json %>"
+            data-chart-data-value="<%= @analytics[:charts][:customers][:data].to_json %>"
           ></canvas>
         </div>
       </div>
@@ -117,12 +162,144 @@
             id="rating-chart"
             data-controller="chart"
             data-chart-type-value="line"
-            data-chart-labels-value="<%= analytics[:rating][:labels].to_json %>"
-            data-chart-data-value="<%= analytics[:rating][:data].to_json %>"
+            data-chart-labels-value="<%= @analytics[:charts][:rating][:labels].to_json %>"
+            data-chart-data-value="<%= @analytics[:charts][:rating][:data].to_json %>"
           ></canvas>
         </div>
       </div>
     </div>
+
+    <!-- Detailed Platform Breakdown Table -->
+    <% if @analytics[:has_data] %>
+      <div class="mt-6 bg-white rounded-lg shadow overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+          <h3 class="font-semibold text-gray-900">Детальная разбивка по платформам</h3>
+          <p class="text-xs text-gray-500 mt-1">Период: <%= @start_date.strftime("%d.%m.%Y") %> — <%= @end_date.strftime("%d.%m.%Y") %></p>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Метрика</th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-green-600 uppercase tracking-wider">
+                  <div class="flex items-center justify-end gap-2">
+                    <span>Grab</span>
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                      <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
+                    </svg>
+                  </div>
+                </th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-blue-600 uppercase tracking-wider">
+                  <div class="flex items-center justify-end gap-2">
+                    <span>GoJek</span>
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                      <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
+                    </svg>
+                  </div>
+                </th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Итого</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              <!-- Sales -->
+              <tr>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">💰 Продажи</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-700"><%= @analytics[:platforms][:grab][:formatted_sales] %></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-700"><%= @analytics[:platforms][:gojek][:formatted_sales] %></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold text-gray-900"><%= @analytics[:summary][:total_sales] %></td>
+              </tr>
+
+              <!-- Orders -->
+              <tr class="bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">📦 Заказов</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-700"><%= number_with_delimiter(@analytics[:platforms][:grab][:orders]) %></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-700"><%= number_with_delimiter(@analytics[:platforms][:gojek][:orders]) %></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold text-gray-900"><%= number_with_delimiter(@analytics[:summary][:total_orders]) %></td>
+              </tr>
+
+              <!-- Average Check -->
+              <tr>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">💵 Средний чек</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-700"><%= @analytics[:platforms][:grab][:formatted_avg_check] %></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-700"><%= @analytics[:platforms][:gojek][:formatted_avg_check] %></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold text-gray-900">
+                  <%= @analytics[:summary][:total_orders] > 0 ? format_currency((@analytics[:platforms][:grab][:sales] + @analytics[:platforms][:gojek][:sales]) / @analytics[:summary][:total_orders]) : "Rp 0" %>
+                </td>
+              </tr>
+
+              <!-- Ads Spend -->
+              <tr class="bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">💸 Затраты на рекламу</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-700"><%= @analytics[:platforms][:grab][:formatted_ads_spend] %></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-700"><%= @analytics[:platforms][:gojek][:formatted_ads_spend] %></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold text-gray-900">
+                  <%= format_currency(@analytics[:platforms][:grab][:ads_spend] + @analytics[:platforms][:gojek][:ads_spend]) %>
+                </td>
+              </tr>
+
+              <!-- ROI -->
+              <tr>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">📈 ROI рекламы</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-right">
+                  <span class="px-2 py-1 text-xs font-semibold rounded-full <%= @analytics[:platforms][:grab][:roi] > 100 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' %>">
+                    <%= @analytics[:platforms][:grab][:roi] %>%
+                  </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-right">
+                  <span class="px-2 py-1 text-xs font-semibold rounded-full <%= @analytics[:platforms][:gojek][:roi] > 100 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' %>">
+                    <%= @analytics[:platforms][:gojek][:roi] %>%
+                  </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-right">
+                  <% total_roi = (@analytics[:platforms][:grab][:ads_spend] + @analytics[:platforms][:gojek][:ads_spend]) > 0 ? (((@analytics[:platforms][:grab][:ads_sales] + @analytics[:platforms][:gojek][:ads_sales]) / (@analytics[:platforms][:grab][:ads_spend] + @analytics[:platforms][:gojek][:ads_spend])) * 100).round(1) : 0 %>
+                  <span class="px-2 py-1 text-xs font-semibold rounded-full <%= total_roi > 100 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' %>">
+                    <%= total_roi %>%
+                  </span>
+                </td>
+              </tr>
+
+              <!-- New Customers -->
+              <tr class="bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">👤 Новые клиенты</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-700"><%= number_with_delimiter(@analytics[:platforms][:grab][:new_customers]) %></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-700"><%= number_with_delimiter(@analytics[:platforms][:gojek][:new_customers]) %></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold text-gray-900"><%= number_with_delimiter(@analytics[:summary][:total_customers]) %></td>
+              </tr>
+
+              <!-- Repeated Customers -->
+              <tr>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">🔄 Повторные клиенты</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-700"><%= number_with_delimiter(@analytics[:platforms][:grab][:repeated_customers]) %></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-700"><%= number_with_delimiter(@analytics[:platforms][:gojek][:returned_customers]) %></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold text-gray-900">
+                  <%= number_with_delimiter(@analytics[:platforms][:grab][:repeated_customers] + @analytics[:platforms][:gojek][:returned_customers]) %>
+                </td>
+              </tr>
+
+              <!-- Fake Orders (if any) -->
+              <% if (@analytics[:platforms][:grab][:fake_orders] + @analytics[:platforms][:gojek][:fake_orders]) > 0 %>
+                <tr class="bg-yellow-50">
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <div class="flex items-center gap-2">
+                      <span>⚠️ Накрутка заказов</span>
+                      <span class="text-xs text-gray-500">(Boost)</span>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-yellow-700"><%= number_with_delimiter(@analytics[:platforms][:grab][:fake_orders]) %></td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-yellow-700"><%= number_with_delimiter(@analytics[:platforms][:gojek][:fake_orders]) %></td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold text-yellow-900">
+                    <%= number_with_delimiter(@analytics[:platforms][:grab][:fake_orders] + @analytics[:platforms][:gojek][:fake_orders]) %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    <% end %>
   <% else %>
     <!-- No client selected -->
     <div class="flex items-center justify-center h-full">

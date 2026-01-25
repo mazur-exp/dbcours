@@ -41,3 +41,12 @@
 !/app/assets/builds/.keep
 
 /config/credentials/production.key
+
+# Delivery collector Node.js script
+/lib/delivery_collector/node_modules/
+/lib/delivery_collector/database/database.sqlite
+/lib/delivery_collector/database/*.sqlite
+/lib/delivery_collector/.env
+/lib/delivery_collector/config.local.js
+
+/config/credentials/development.key
