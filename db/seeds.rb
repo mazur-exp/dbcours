@@ -70,8 +70,62 @@ puts "  ❌ Errors: #{errors}"
 puts "  📋 Total in database: #{Client.count}"
 puts "=" * 70
 puts
-puts "🎉 Seeding completed!"
+puts "🎉 Clients seeding completed!"
 puts
 puts "💡 Next steps:"
 puts "   • Verify clients: bin/rails console"
 puts "   • Check credentials: Client.where.not(grab_token: nil).count"
+
+# ============================================================================
+# Import ClientStats (Delivery Data History)
+# ============================================================================
+puts
+puts "=" * 70
+puts "📊 Importing ClientStats (delivery data history)..."
+puts "=" * 70
+puts
+
+stats_file = Rails.root.join("db", "client_stats_export.json")
+
+unless File.exist?(stats_file)
+  puts "⚠️  ClientStats file not found: #{stats_file}"
+  puts "   Skipping ClientStats import (dashboard will be empty until data collection runs)"
+else
+  stats_data = JSON.parse(File.read(stats_file))
+  puts "📦 Found #{stats_data.length} ClientStat records in export"
+  puts
+
+  stats_imported = 0
+  stats_errors = 0
+
+  stats_data.each_with_index do |attrs, index|
+    begin
+      ClientStat.upsert(
+        attrs,
+        unique_by: [:client_id, :stat_date]
+      )
+      stats_imported += 1
+
+      # Progress indicator every 1000 records
+      if (index + 1) % 1000 == 0
+        puts "   Imported #{index + 1}/#{stats_data.length} records..."
+      end
+    rescue StandardError => e
+      stats_errors += 1
+      puts "❌ Error importing stat #{index}: #{e.message}" if stats_errors <= 5
+    end
+  end
+
+  puts
+  puts "=" * 70
+  puts "📊 ClientStats Import Summary:"
+  puts "  ✅ Imported: #{stats_imported} records"
+  puts "  ❌ Errors: #{stats_errors}"
+  if ClientStat.any?
+    puts "  📅 Date range: #{ClientStat.minimum(:stat_date)} to #{ClientStat.maximum(:stat_date)}"
+    puts "  🏪 Clients with data: #{Client.joins(:client_stats).distinct.count}"
+  end
+  puts "=" * 70
+  puts
+  puts "🎉 Full seeding completed!"
+end
