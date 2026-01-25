@@ -235,4 +235,155 @@ add_column :clients, :gojek_access_token, :text
 - ✅ Credentials импортированы
 - ✅ Dockerfile обновлён
 
-**Следующий шаг:** `bin/kamal deploy`
+**Следующий шаг:** `bin/kamal deploy` ✅ ВЫПОЛНЕНО
+
+---
+
+## 🚀 Production Deployment - Вечер (25.01.2026)
+
+### Проблемы при деплое:
+
+#### 1. **YAML Syntax Error в production.yml.enc**
+```
+Error: did not find expected key while parsing a block mapping at line 18
+```
+
+**Причина:** Неправильная indentation в credentials файле
+
+**Решение:**
+```bash
+EDITOR=nano bin/rails credentials:edit --environment production
+# Исправили YAML синтаксис на строке 18
+git commit -m "Fix YAML syntax error in production credentials"
+```
+
+#### 2. **Import Script Crashing on Boot**
+```
+❌ File not found: /rails/lib/delivery_collector/restaurants_temp.json
+```
+
+**Причина:** `config.autoload_lib` автоматически загружал `import_credentials.rb` при каждом boot Rails
+
+**Решение:**
+```ruby
+# config/application.rb
+config.autoload_lib(ignore: %w[assets tasks delivery_collector])
+```
+
+Commit: "Exclude delivery_collector from Rails autoload"
+
+#### 3. **Empty Dashboard После Успешного Деплоя**
+```
+Production DB:
+✅ 127 Clients (imported via db:seed)
+❌ 0 ClientStats (no data)
+
+Dashboard shows: "Нет клиентов"
+```
+
+**Причина:**
+- Controller делает `Client.joins(:client_stats)` (INNER JOIN)
+- Без ClientStats таблицы - клиенты не отображаются
+- Seeds.rb импортировал только Clients, но не ClientStats
+
+**Решение:**
+```ruby
+# db/seeds.rb - добавили импорт ClientStats
+stats_data = JSON.parse(File.read("db/client_stats_export.json"))
+stats_data.each do |attrs|
+  ClientStat.upsert(attrs, unique_by: [:client_id, :stat_date])
+end
+```
+
+Commits:
+1. "Add production database seeds with client credentials"
+2. "Add ClientStats export for production seeding"
+
+---
+
+### Финальный деплой ✅
+
+```bash
+bin/kamal deploy
+# → Успех! Контейнер запустился
+
+bin/kamal app exec 'bin/rails db:seed'
+# → Импортировано:
+#    - 127 Clients (skipped - already exist)
+#    - 30,156 ClientStat records
+#    - Date range: 2025-01-25 to 2026-01-24
+```
+
+### Результат Production:
+
+✅ **https://admin.aidelivery.tech/dashboard**
+- 127 клиентов в sidebar
+- Полная годовая статистика
+- Графики работают
+- Кнопка "Собрать данные" видна
+- AI Chat работает
+- Автоматический сбор настроен (8:30 AM Bali ежедневно)
+
+---
+
+## 📚 Обновлённая документация:
+
+### Исправлено в:
+
+1. **lib/delivery_collector/README.md**
+   - Уточнено что "локальная SQLite" = временный кеш
+   - Добавлена секция про первичную настройку production
+   - Четко написано про необходимость seeds.rb
+
+2. **ai_docs/development/delivery_collector_integration.md**
+   - Добавлена диаграмма различия временной и production баз
+   - Уточнён data flow (HTTP POST вместо прямого SQLite)
+   - Добавлено предупреждение про необходимость seeds
+
+3. **ai_docs/development/deployment.md**
+   - Добавлен шаг 4 в First-Time Setup: Import Production Data
+   - Объяснение почему seeds.rb критичен (INNER JOIN)
+
+---
+
+## 🎓 Уроки
+
+### Что работает:
+- ✅ Kamal deployment с Docker
+- ✅ Rails 8 + Solid Queue/Cache/Cable
+- ✅ Multi-domain routing (3 домена)
+- ✅ Encrypted credentials
+- ✅ Node.js скрипт в Docker
+- ✅ Background jobs с расписанием
+
+### Подводные камни:
+- ⚠️ Kamal игнорирует uncommitted changes (нужен commit перед deploy)
+- ⚠️ autoload_lib загружает ВСЕ .rb файлы (нужен ignore для скриптов)
+- ⚠️ INNER JOIN требует данных в обеих таблицах (иначе UI пустой)
+- ⚠️ Seeds.rb должен быть идемпотентным (upsert вместо create)
+
+---
+
+## ✅ Итоговый статус проекта
+
+**Production Ready:** ✅ Всё работает!
+
+**URLs:**
+- Course: https://course.aidelivery.tech
+- CRM: https://crm.aidelivery.tech
+- Admin: https://admin.aidelivery.tech/dashboard
+
+**Database:**
+- Clients: 127 (с API credentials)
+- ClientStats: 30,156 (годовая статистика)
+- Users: (Telegram leads)
+- Conversations/Messages: (CRM)
+
+**Automation:**
+- Сбор данных: 8:30 AM Bali ежедневно
+- Очистка job queue: каждый час
+
+**Next Steps:**
+- Мониторинг первого автоматического запуска (завтра в 8:30)
+- Проверка логов CollectDeliveryDataJob
+- Возможно добавить alerts при ошибках сбора

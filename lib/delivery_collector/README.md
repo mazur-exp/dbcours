@@ -43,8 +43,10 @@ Node.js script:
 - For each client:
   - Fetches Grab API data (10 endpoints)
   - Fetches GoJek API data (15 endpoints)
-  - Saves to local SQLite (temporary)
-- Then syncs all data to Rails `client_stats` table
+  - Saves to temporary SQLite (lib/delivery_collector/database/database.sqlite)
+    ⚠️ This is a TEMPORARY cache, NOT the production database!
+- Then sends all data to Rails via HTTP POST /api/collector/save_stats
+- Rails saves to production `client_stats` table (storage/production.sqlite3)
 ```
 
 ### Step 2: Display (instant!)
@@ -167,13 +169,34 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
 RUN cd /rails/lib/delivery_collector && npm install --production
 ```
 
-### Deploy:
+### Initial Production Setup:
+
+⚠️ **IMPORTANT:** After first deploy, you MUST import ClientStats data, otherwise dashboard will be empty!
 
 ```bash
+# 1. Deploy application
 bin/kamal deploy
 
-# Script will be copied to container and dependencies installed
-# Job will run automatically at 8:30 AM Bali every day
+# 2. Run seeds to import Clients + ClientStats
+bin/kamal app exec 'bin/rails db:seed'
+
+# This imports:
+# - 127 Clients with API credentials
+# - 30,156 ClientStat records (full year of historical data)
+```
+
+**Why this is needed:**
+- Dashboard controller uses `INNER JOIN` between `clients` and `client_stats`
+- Without ClientStats, no clients will show in the UI
+- CollectDeliveryDataJob only collects last 90 days on first run
+- Seeds.rb provides full year of historical data instantly
+
+### Automatic Collection:
+
+After initial setup, job runs automatically:
+```bash
+# Scheduled in config/recurring.yml
+# Every day at 8:30 AM Bali (00:30 UTC)
 ```
 
 ---

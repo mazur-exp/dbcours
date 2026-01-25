@@ -184,18 +184,21 @@ Open3.capture3(env, "node start.js both", ...)
    └─ Для каждого ресторана:
       ├─ 10 endpoints Grab API
       ├─ 15 endpoints GoJek API
-      └─ Сохраняет в локальную SQLite
+      └─ Временно сохраняет в lib/delivery_collector/database/database.sqlite
+         (это ВРЕМЕННЫЙ кеш для backup, НЕ production база!)
 
 5. Скрипт синхронизирует с Rails
-   └─ POST /api/collector/save_stats
+   └─ POST http://localhost:3000/api/collector/save_stats
    └─ Для каждого ресторана отправляет grab_stats + gojek_stats
+   └─ HTTP вместо прямого SQLite (работает на всех платформах)
 
-6. Rails API сохраняет в базу
+6. Rails API сохраняет в PRODUCTION базу
    └─ ClientStat.upsert (по client_id + stat_date)
-   └─ Мгновенная запись в SQLite
+   └─ Запись в storage/production.sqlite3
+   └─ Это НАСТОЯЩАЯ production база, которую читает dashboard!
 
 7. Dashboard показывает данные
-   └─ Запросы к client_stats (<15ms)
+   └─ Запросы к client_stats из storage/production.sqlite3 (<15ms)
 ```
 
 ### Manual Collection (Button Click)
@@ -381,26 +384,74 @@ bin/kamal deploy
 
 ### Post-deployment Steps
 
+⚠️ **CRITICAL: First-time production setup requires seeds!**
+
 ```bash
-# 1. First manual collection
-bin/kamal app exec -i 'bin/rails console'
-> CollectDeliveryDataJob.perform_now
-> exit
+# 1. Run seeds to import Clients + ClientStats
+bin/kamal app exec 'bin/rails db:seed'
 
-# 2. Verify data collected
-bin/kamal app exec 'bin/rails runner "puts ClientStat.count"'
+# Output should show:
+# - 127 clients imported
+# - 30,156 ClientStat records imported
+# - Date range: 2025-01-25 to 2026-01-24
 
-# 3. Check logs
-bin/kamal app logs --since 30m | grep Collection
+# 2. Verify data imported
+bin/kamal app exec 'bin/rails runner "
+  puts \"Clients: #{Client.count}\"
+  puts \"ClientStats: #{ClientStat.count}\"
+  puts \"Date range: #{ClientStat.minimum(:stat_date)} to #{ClientStat.maximum(:stat_date)}\"
+"'
 
-# 4. Test UI
+# 3. Check dashboard
 open https://admin.aidelivery.tech/dashboard
-# Click "Собрать данные" button
+# Should now see 127 clients in sidebar
+# Click any client → should see analytics charts
+# "Собрать данные" button should be visible
+
+# 4. (Optional) Test manual collection
+# bin/kamal app exec -i 'bin/rails console'
+# > CollectDeliveryDataJob.perform_now
+# > exit
 ```
+
+**Why seeds.rb is required:**
+- Dashboard controller does `Client.joins(:client_stats)` (INNER JOIN)
+- Without ClientStats, NO clients show in UI (even though they exist in DB)
+- Seeds provides full year of historical data (30,156 records)
+- Alternative (CollectDeliveryDataJob) only gives last 90 days on first run
 
 ---
 
 ## 🔧 Technical Details
+
+### Database Architecture
+
+**⚠️ ВАЖНО: Две разные SQLite базы!**
+
+```
+┌─────────────────────────────────────────────────────┐
+│ Docker Container (Production)                       │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│  lib/delivery_collector/database/database.sqlite   │
+│  └─ ВРЕМЕННЫЙ кеш (backup если HTTP упадёт)        │
+│     ├─ restaurants (meta)                           │
+│     ├─ grab_stats (temporary)                       │
+│     └─ gojek_stats (temporary)                      │
+│                                                     │
+│  ↓ HTTP POST                                        │
+│                                                     │
+│  storage/production.sqlite3                         │
+│  └─ PRODUCTION база (читает dashboard!)            │
+│     ├─ clients (127 клиентов)                       │
+│     └─ client_stats (30,156 записей)               │
+│                                                     │
+└─────────────────────────────────────────────────────┘
+```
+
+**Почему две базы?**
+1. **Временная** - для сохранности данных если Rails недоступен
+2. **Production** - единый источник правды для всего приложения
 
 ### HTTP API Approach
 
@@ -409,6 +460,7 @@ open https://admin.aidelivery.tech/dashboard
 - HTTP API работает везде (macOS, Linux, Docker)
 - Минимальная латентность (~5-10ms)
 - Проще отладка (логи Rails)
+- Автоматическая валидация через Rails models
 
 **Как работает:**
 

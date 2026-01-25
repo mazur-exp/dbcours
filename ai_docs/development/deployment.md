@@ -130,6 +130,23 @@ bin/kamal setup
 - Runs database migrations
 - Starts health checks
 
+**4. Import Production Data:**
+```bash
+# ⚠️ CRITICAL STEP - Import Clients + ClientStats
+bin/kamal app exec 'bin/rails db:seed'
+```
+
+**What it does:**
+- Imports 127 Clients with API credentials (Grab/GoJek tokens)
+- Imports 30,156 ClientStat records (full year of delivery data)
+- Without this, dashboard will be empty (shows "No clients")
+
+**Why this is needed:**
+- Dashboard uses `INNER JOIN` between clients and client_stats
+- No ClientStats = No clients visible in UI
+- Seeds.rb provides instant full year of data
+- Alternative (running CollectDeliveryDataJob) takes 15 min and gives only 90 days
+
 ---
 
 ## Standard Deployment
