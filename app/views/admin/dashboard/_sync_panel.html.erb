@@ -15,9 +15,9 @@
 
   <div class="text-xs text-gray-500 mt-3 space-y-1">
     <p>📅 Последнее обновление: <%= @last_sync&.strftime("%d.%m.%Y %H:%M") || "Никогда" %></p>
-    <p>📊 Записей в базе: <%= number_with_delimiter(ClientStat.count) %></p>
-    <% if ClientStat.any? %>
-      <p>📆 Период данных: <%= ClientStat.minimum(:stat_date)&.strftime("%d.%m.%Y") %> — <%= ClientStat.maximum(:stat_date)&.strftime("%d.%m.%Y") %></p>
+    <p>📊 Записей в базе: <%= number_with_delimiter(RestaurantStat.count) %></p>
+    <% if RestaurantStat.any? %>
+      <p>📆 Период данных: <%= RestaurantStat.minimum(:stat_date)&.strftime("%d.%m.%Y") %> — <%= RestaurantStat.maximum(:stat_date)&.strftime("%d.%m.%Y") %></p>
     <% end %>
     <p class="text-green-600">⚡ Автоматически каждый день в 8:30 AM (Bali)</p>
   </div>
