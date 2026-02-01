@@ -52,10 +52,12 @@ COPY . .
 RUN bundle exec bootsnap precompile app/ lib/
 
 # Install Node.js dependencies for delivery collector
+# Build native modules (sqlite3) in build stage where we have compilers
 RUN if [ -d /rails/lib/delivery_collector ]; then \
       cd /rails/lib/delivery_collector && \
-      npm install --production --ignore-scripts && \
-      echo "Delivery collector dependencies installed"; \
+      npm install --production && \
+      npm rebuild sqlite3 --build-from-source && \
+      echo "Delivery collector dependencies installed with native bindings"; \
     fi
 
 # Precompiling assets for production without requiring secret RAILS_MASTER_KEY
