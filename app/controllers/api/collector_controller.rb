@@ -5,18 +5,18 @@ module Api
     skip_before_action :verify_authenticity_token
 
     # POST /api/collector/save_stats
-    # Receives data from Node.js collection script and saves to client_stats
+    # Receives data from Node.js collection script and saves to restaurant_stats
     def save_stats
       restaurant_name = params[:restaurant_name]
       grab_stats = params[:grab_stats] || []
       gojek_stats = params[:gojek_stats] || []
 
-      client = Client.find_by(name: restaurant_name)
+      restaurant = Restaurant.find_by(name: restaurant_name)
 
-      unless client
+      unless restaurant
         return render json: {
           success: false,
-          error: "Client '#{restaurant_name}' not found"
+          error: "Restaurant '#{restaurant_name}' not found"
         }, status: 404
       end
 
@@ -28,7 +28,7 @@ module Api
         date = stat[:stat_date]
         next if date.blank?
 
-        stats_by_date[date] ||= initialize_stat_record(client.id, date)
+        stats_by_date[date] ||= initialize_stat_record(restaurant.id, date)
         stats_by_date[date][:grab_sales] = stat[:sales].to_f
         stats_by_date[date][:grab_orders] = stat[:orders].to_i
         stats_by_date[date][:grab_ads_spend] = stat[:ads_spend].to_f
@@ -42,7 +42,7 @@ module Api
         date = stat[:stat_date]
         next if date.blank?
 
-        stats_by_date[date] ||= initialize_stat_record(client.id, date)
+        stats_by_date[date] ||= initialize_stat_record(restaurant.id, date)
         stats_by_date[date][:gojek_sales] = stat[:sales].to_f
         stats_by_date[date][:gojek_orders] = stat[:orders].to_i
         stats_by_date[date][:gojek_ads_spend] = stat[:ads_spend].to_f
@@ -57,14 +57,14 @@ module Api
         data[:total_sales] = data[:grab_sales] + data[:gojek_sales]
         data[:total_orders] = data[:grab_orders] + data[:gojek_orders]
 
-        ClientStat.upsert(data, unique_by: [:client_id, :stat_date])
+        RestaurantStat.upsert(data, unique_by: [:restaurant_id, :stat_date])
         saved_count += 1
       end
 
       render json: {
         success: true,
         restaurant_name: restaurant_name,
-        client_id: client.id,
+        restaurant_id: restaurant.id,
         saved_count: saved_count
       }
     rescue StandardError => e
@@ -79,9 +79,9 @@ module Api
 
     private
 
-    def initialize_stat_record(client_id, date)
+    def initialize_stat_record(restaurant_id, date)
       {
-        client_id: client_id,
+        restaurant_id: restaurant_id,
         stat_date: date,
         grab_sales: 0,
         grab_orders: 0,

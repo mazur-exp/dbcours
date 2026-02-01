@@ -1,18 +1,18 @@
 <%= render 'admin/shared/header' %>
 
-<div class="flex h-[calc(100vh-64px)]" data-controller="admin-clients">
-  <!-- Left sidebar: Clients list -->
-  <%= render 'clients_sidebar', clients: @clients, selected_client: @selected_client %>
+<div class="flex h-[calc(100vh-64px)]" data-controller="admin-restaurants">
+  <!-- Left sidebar: Restaurants list -->
+  <%= render 'restaurants_sidebar', restaurants: @restaurants, selected_restaurant: @selected_restaurant %>
 
   <!-- Center: Analytics + AI Chat -->
   <div class="flex-1 flex flex-col overflow-hidden">
     <!-- Analytics section -->
-    <%= render 'analytics_center', analytics: @analytics, selected_client: @selected_client %>
+    <%= render 'analytics_center', analytics: @analytics, selected_restaurant: @selected_restaurant %>
 
     <!-- AI Chat section -->
     <%= render 'ai_chat' %>
   </div>
 
-  <!-- Right sidebar: Client info -->
-  <%= render 'client_info', client: @selected_client %>
+  <!-- Right sidebar: Restaurant info -->
+  <%= render 'restaurant_info', restaurant: @selected_restaurant %>
 </div>

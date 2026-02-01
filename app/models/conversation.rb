@@ -1,5 +1,7 @@
 class Conversation < ApplicationRecord
-  belongs_to :user
+  # Polymorphic association - can belong to User or Client
+  belongs_to :conversable, polymorphic: true
+  belongs_to :user, optional: true  # Backward compatibility
   has_many :messages, dependent: :destroy
 
   # Callbacks
@@ -11,6 +13,8 @@ class Conversation < ApplicationRecord
   scope :with_unread, -> { where('unread_count > 0') }
   scope :needs_escalation, -> { where(ai_action: ['escalate', 'schedule_call']) }
   scope :pql_leads, -> { where(ai_is_pql: true) }
+  scope :for_users, -> { where(conversable_type: 'User') }
+  scope :for_clients, -> { where(conversable_type: 'Client') }
 
   # Получить последнее сообщение
   def last_message
@@ -31,6 +35,20 @@ class Conversation < ApplicationRecord
   def mark_all_read!
     update!(unread_count: 0)
     messages.where(read: false).update_all(read: true)
+  end
+
+  # Check conversation type
+  def user_conversation?
+    conversable_type == 'User'
+  end
+
+  def client_conversation?
+    conversable_type == 'Client'
+  end
+
+  # Get the actual user or client
+  def owner
+    conversable
   end
 
   private

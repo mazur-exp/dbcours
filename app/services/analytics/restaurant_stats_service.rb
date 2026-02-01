@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
 module Analytics
-  class ClientStatsService
-    attr_reader :client, :start_date, :end_date
+  class RestaurantStatsService
+    attr_reader :restaurant, :start_date, :end_date
 
-    def initialize(client, start_date: nil, end_date: nil)
-      @client = client
+    def initialize(restaurant, start_date: nil, end_date: nil)
+      @restaurant = restaurant
       # Default to last 30 days (excluding today)
       @end_date = end_date || (Date.today - 1.day)
       @start_date = start_date || (@end_date - 30.days)
@@ -14,7 +14,7 @@ module Analytics
     # Get complete analytics data for the dashboard
     def call
       # Read from LOCAL database instead of HTTP API!
-      stats = client.client_stats.for_period(start_date, end_date).ordered_by_date
+      stats = restaurant.restaurant_stats.for_period(start_date, end_date).ordered_by_date
 
       if stats.empty?
         return placeholder_data
@@ -121,7 +121,7 @@ module Analytics
       # Still fetch from API (rarely changes, small request)
       Rails.cache.fetch(cache_key("commission_settings"), expires_in: 24.hours) do
         result = DeliveryStatsClient.get_restaurant_stats(
-          restaurant_name: client.name,
+          restaurant_name: restaurant.name,
           source: "commission_settings"
         )
 
@@ -159,7 +159,7 @@ module Analytics
     end
 
     def cache_key(suffix)
-      "client_#{client.id}_#{start_date}_#{end_date}_#{suffix}"
+      "restaurant_#{restaurant.id}_#{start_date}_#{end_date}_#{suffix}"
     end
 
     def placeholder_data

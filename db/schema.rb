@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_01_25_124116) do
+ActiveRecord::Schema[8.0].define(version: 2026_02_01_113114) do
   create_table "business_connections", force: :cascade do |t|
     t.string "business_connection_id", null: false
     t.integer "user_id", null: false
@@ -27,62 +27,29 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_25_124116) do
     t.index ["user_id"], name: "index_business_connections_on_user_id"
   end
 
-  create_table "client_stats", force: :cascade do |t|
-    t.integer "client_id", null: false
-    t.date "stat_date", null: false
-    t.decimal "grab_sales", precision: 12, scale: 2, default: "0.0"
-    t.integer "grab_orders", default: 0
-    t.decimal "grab_ads_spend", precision: 12, scale: 2, default: "0.0"
-    t.decimal "grab_ads_sales", precision: 12, scale: 2, default: "0.0"
-    t.integer "grab_new_customers", default: 0
-    t.integer "grab_repeated_customers", default: 0
-    t.integer "grab_fake_orders", default: 0
-    t.decimal "gojek_sales", precision: 12, scale: 2, default: "0.0"
-    t.integer "gojek_orders", default: 0
-    t.decimal "gojek_ads_spend", precision: 12, scale: 2, default: "0.0"
-    t.decimal "gojek_ads_sales", precision: 12, scale: 2, default: "0.0"
-    t.integer "gojek_new_customers", default: 0
-    t.integer "gojek_returned_customers", default: 0
-    t.integer "gojek_fake_orders", default: 0
-    t.decimal "total_sales", precision: 12, scale: 2, default: "0.0"
-    t.integer "total_orders", default: 0
-    t.datetime "synced_at"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["client_id", "stat_date"], name: "index_client_stats_on_client_and_date", unique: true
-    t.index ["client_id"], name: "index_client_stats_on_client_id"
-    t.index ["stat_date"], name: "index_client_stats_on_stat_date"
-    t.index ["synced_at"], name: "index_client_stats_on_synced_at"
-    t.index ["total_sales"], name: "index_client_stats_on_total_sales"
-  end
-
   create_table "clients", force: :cascade do |t|
     t.string "name", null: false
+    t.string "contact_name"
+    t.string "contact_phone"
+    t.string "contact_email"
+    t.string "contact_telegram"
+    t.decimal "monthly_fee", precision: 12, scale: 2
+    t.decimal "commission_percent", precision: 5, scale: 2
+    t.decimal "commission_amount", precision: 12, scale: 2, default: "0.0"
+    t.integer "manager_id"
+    t.string "status", default: "active"
+    t.bigint "telegram_chat_id"
+    t.string "whatsapp_chat_id"
+    t.string "channel_type"
     t.date "start_date"
     t.text "goals"
     t.text "notes"
-    t.string "contact_name"
-    t.string "contact_phone"
-    t.string "contact_telegram"
-    t.string "status", default: "active"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.text "grab_token"
-    t.string "grab_user_id"
-    t.string "grab_store_id"
-    t.string "grab_merchant_id"
-    t.string "grab_advertiser_id"
-    t.string "grab_food_entity_id"
-    t.string "gojek_merchant_id"
-    t.string "gojek_client_id"
-    t.text "gojek_refresh_token"
-    t.text "gojek_access_token"
-    t.string "grab_username"
-    t.string "grab_password"
-    t.string "gojek_username"
-    t.string "gojek_password"
+    t.index ["manager_id"], name: "index_clients_on_manager_id"
     t.index ["name"], name: "index_clients_on_name"
     t.index ["status"], name: "index_clients_on_status"
+    t.index ["telegram_chat_id"], name: "index_clients_on_telegram_chat_id"
   end
 
   create_table "conversations", force: :cascade do |t|
@@ -110,6 +77,10 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_25_124116) do
     t.string "ai_action", default: "none"
     t.json "ai_red_flags"
     t.json "ai_pql_signals"
+    t.string "conversable_type"
+    t.integer "conversable_id"
+    t.string "channel_type", default: "telegram"
+    t.index ["conversable_type", "conversable_id"], name: "index_conversations_on_conversable_type_and_conversable_id"
     t.index ["last_message_at"], name: "index_conversations_on_last_message_at"
     t.index ["user_id"], name: "index_conversations_on_user_id"
   end
@@ -131,6 +102,66 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_25_124116) do
     t.index ["conversation_id"], name: "index_messages_on_conversation_id"
     t.index ["telegram_message_id"], name: "index_messages_on_telegram_message_id"
     t.index ["user_id"], name: "index_messages_on_user_id"
+  end
+
+  create_table "restaurant_stats", force: :cascade do |t|
+    t.integer "restaurant_id", null: false
+    t.date "stat_date", null: false
+    t.decimal "grab_sales", precision: 12, scale: 2, default: "0.0"
+    t.integer "grab_orders", default: 0
+    t.decimal "grab_ads_spend", precision: 12, scale: 2, default: "0.0"
+    t.decimal "grab_ads_sales", precision: 12, scale: 2, default: "0.0"
+    t.integer "grab_new_customers", default: 0
+    t.integer "grab_repeated_customers", default: 0
+    t.integer "grab_fake_orders", default: 0
+    t.decimal "gojek_sales", precision: 12, scale: 2, default: "0.0"
+    t.integer "gojek_orders", default: 0
+    t.decimal "gojek_ads_spend", precision: 12, scale: 2, default: "0.0"
+    t.decimal "gojek_ads_sales", precision: 12, scale: 2, default: "0.0"
+    t.integer "gojek_new_customers", default: 0
+    t.integer "gojek_returned_customers", default: 0
+    t.integer "gojek_fake_orders", default: 0
+    t.decimal "total_sales", precision: 12, scale: 2, default: "0.0"
+    t.integer "total_orders", default: 0
+    t.datetime "synced_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["restaurant_id", "stat_date"], name: "index_client_stats_on_client_and_date", unique: true
+    t.index ["restaurant_id"], name: "index_restaurant_stats_on_restaurant_id"
+    t.index ["stat_date"], name: "index_restaurant_stats_on_stat_date"
+    t.index ["synced_at"], name: "index_restaurant_stats_on_synced_at"
+    t.index ["total_sales"], name: "index_restaurant_stats_on_total_sales"
+  end
+
+  create_table "restaurants", force: :cascade do |t|
+    t.string "name", null: false
+    t.date "start_date"
+    t.text "goals"
+    t.text "notes"
+    t.string "contact_name"
+    t.string "contact_phone"
+    t.string "contact_telegram"
+    t.string "status", default: "active"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.text "grab_token"
+    t.string "grab_user_id"
+    t.string "grab_store_id"
+    t.string "grab_merchant_id"
+    t.string "grab_advertiser_id"
+    t.string "grab_food_entity_id"
+    t.string "gojek_merchant_id"
+    t.string "gojek_client_id"
+    t.text "gojek_refresh_token"
+    t.text "gojek_access_token"
+    t.string "grab_username"
+    t.string "grab_password"
+    t.string "gojek_username"
+    t.string "gojek_password"
+    t.integer "client_id"
+    t.index ["client_id"], name: "index_restaurants_on_client_id"
+    t.index ["name"], name: "index_restaurants_on_name"
+    t.index ["status"], name: "index_restaurants_on_status"
   end
 
   create_table "traffic_clicks", force: :cascade do |t|
@@ -186,10 +217,12 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_25_124116) do
   end
 
   add_foreign_key "business_connections", "users"
-  add_foreign_key "client_stats", "clients"
+  add_foreign_key "clients", "users", column: "manager_id"
   add_foreign_key "conversations", "users"
   add_foreign_key "messages", "conversations"
   add_foreign_key "messages", "users"
+  add_foreign_key "restaurant_stats", "restaurants"
+  add_foreign_key "restaurants", "clients"
   add_foreign_key "traffic_clicks", "traffic_sources"
   add_foreign_key "traffic_clicks", "users"
   add_foreign_key "users", "traffic_sources"

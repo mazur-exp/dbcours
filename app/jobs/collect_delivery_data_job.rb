@@ -27,26 +27,26 @@ class CollectDeliveryDataJob < ApplicationJob
   private
 
   def prepare_restaurants_credentials
-    # Get all active clients with their API credentials
-    clients = Client.active
+    # Get all active restaurants with their API credentials
+    restaurants_db = Restaurant.active
 
-    restaurants = clients.map do |client|
+    restaurants = restaurants_db.map do |restaurant|
       {
-        name: client.name,
-        gojek_merchant_id: client.gojek_merchant_id,
-        gojek_client_id: client.gojek_client_id || "YEZympJ5WqYRh7Hs",
-        gojek_refresh_token: client.gojek_refresh_token,
-        gojek_access_token: client.gojek_access_token,
-        grab_token: client.grab_token,
-        grab_user_id: client.grab_user_id,
-        grab_store_id: client.grab_store_id,
-        grab_merchant_id: client.grab_merchant_id,
-        grab_advertiser_id: client.grab_advertiser_id,
-        grab_food_entity_id: client.grab_food_entity_id
+        name: restaurant.name,
+        gojek_merchant_id: restaurant.gojek_merchant_id,
+        gojek_client_id: restaurant.gojek_client_id || "YEZympJ5WqYRh7Hs",
+        gojek_refresh_token: restaurant.gojek_refresh_token,
+        gojek_access_token: restaurant.gojek_access_token,
+        grab_token: restaurant.grab_token,
+        grab_user_id: restaurant.grab_user_id,
+        grab_store_id: restaurant.grab_store_id,
+        grab_merchant_id: restaurant.grab_merchant_id,
+        grab_advertiser_id: restaurant.grab_advertiser_id,
+        grab_food_entity_id: restaurant.grab_food_entity_id
       }.compact  # Remove nil values
     end
 
-    Rails.logger.info "[Collection] Prepared credentials for #{restaurants.count} clients"
+    Rails.logger.info "[Collection] Prepared credentials for #{restaurants.count} restaurants"
     restaurants.to_json
   end
 

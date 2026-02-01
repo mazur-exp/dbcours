@@ -3,35 +3,35 @@
 class SyncDeliveryStatsJob < ApplicationJob
   queue_as :default
 
-  def perform(days_back: 365, client_ids: nil)
+  def perform(days_back: 365, restaurant_ids: nil)
     start_date = Date.today - days_back.days
     end_date = Date.today - 1.day
 
     Rails.logger.info "Starting delivery stats sync for #{days_back} days (#{start_date} to #{end_date})"
 
-    clients = client_ids ? Client.where(id: client_ids) : Client.active
+    restaurants = restaurant_ids ? Restaurant.where(id: restaurant_ids) : Restaurant.active
     synced_count = 0
     error_count = 0
 
-    clients.find_each do |client|
+    restaurants.find_each do |restaurant|
       begin
-        sync_client_stats(client, start_date, end_date)
+        sync_restaurant_stats(restaurant, start_date, end_date)
         synced_count += 1
-        Rails.logger.info "✓ Synced #{client.name}"
+        Rails.logger.info "✓ Synced #{restaurant.name}"
       rescue StandardError => e
         error_count += 1
-        Rails.logger.error "✗ Failed to sync #{client.name}: #{e.message}"
+        Rails.logger.error "✗ Failed to sync #{restaurant.name}: #{e.message}"
       end
     end
 
-    Rails.logger.info "Sync completed: #{synced_count} clients synced, #{error_count} errors"
+    Rails.logger.info "Sync completed: #{synced_count} restaurants synced, #{error_count} errors"
   end
 
   private
 
-  def sync_client_stats(client, start_date, end_date)
+  def sync_restaurant_stats(restaurant, start_date, end_date)
     result = DeliveryStatsClient.get_restaurant_stats(
-      restaurant_name: client.name,
+      restaurant_name: restaurant.name,
       source: "looker_summary",
       start_date: start_date,
       end_date: end_date
@@ -40,9 +40,9 @@ class SyncDeliveryStatsJob < ApplicationJob
     return if result[:error] || result[:data].nil? || result[:data].empty?
 
     result[:data].each do |day_data|
-      ClientStat.upsert(
+      RestaurantStat.upsert(
         {
-          client_id: client.id,
+          restaurant_id: restaurant.id,
           stat_date: Date.parse(day_data[:stat_date]),
           grab_sales: day_data[:grab_sales].to_f,
           grab_orders: day_data[:grab_orders] || 0,
@@ -62,7 +62,7 @@ class SyncDeliveryStatsJob < ApplicationJob
           total_orders: (day_data[:grab_orders] || 0) + (day_data[:gojek_orders] || 0),
           synced_at: Time.current
         },
-        unique_by: [:client_id, :stat_date]
+        unique_by: [:restaurant_id, :stat_date]
       )
     end
   end

@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
-class ClientStat < ApplicationRecord
-  belongs_to :client
+class RestaurantStat < ApplicationRecord
+  belongs_to :restaurant
 
-  validates :client_id, :stat_date, presence: true
-  validates :stat_date, uniqueness: { scope: :client_id }
+  validates :restaurant_id, :stat_date, presence: true
+  validates :stat_date, uniqueness: { scope: :restaurant_id }
 
   # Scopes
   scope :for_period, ->(start_date, end_date) { where(stat_date: start_date..end_date) }

@@ -16,16 +16,16 @@ module Admin
 
     # GET /admin/sync_status - Get collection status (JSON)
     def status
-      last_sync = ClientStat.maximum(:synced_at)
-      total_records = ClientStat.count
-      date_range = ClientStat.where.not(stat_date: nil).pluck("MIN(stat_date)", "MAX(stat_date)").first || [nil, nil]
+      last_sync = RestaurantStat.maximum(:synced_at)
+      total_records = RestaurantStat.count
+      date_range = RestaurantStat.where.not(stat_date: nil).pluck("MIN(stat_date)", "MAX(stat_date)").first || [nil, nil]
 
       render json: {
         last_sync: last_sync,
         total_records: total_records,
         earliest_date: date_range[0],
         latest_date: date_range[1],
-        clients_count: Client.joins(:client_stats).distinct.count
+        restaurants_count: Restaurant.joins(:restaurant_stats).distinct.count
       }
     end
   end

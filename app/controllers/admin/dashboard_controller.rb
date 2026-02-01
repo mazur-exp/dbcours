@@ -8,22 +8,22 @@ module Admin
       @start_date = params[:start_date]&.to_date || (@end_date - 30.days)
 
       # FAST query with local data - sorted by sales!
-      @clients = Client.active
-        .joins(:client_stats)
-        .where(client_stats: { stat_date: @start_date..@end_date })
-        .select("clients.*, SUM(client_stats.total_sales) as period_sales")
-        .group("clients.id")
+      @restaurants = Restaurant.active
+        .joins(:restaurant_stats)
+        .where(restaurant_stats: { stat_date: @start_date..@end_date })
+        .select("restaurants.*, SUM(restaurant_stats.total_sales) as period_sales")
+        .group("restaurants.id")
         .order("period_sales DESC")
 
-      @selected_client = @clients.find { |c| c.id == params[:client_id]&.to_i } || @clients.first
+      @selected_restaurant = @restaurants.find { |r| r.id == params[:restaurant_id]&.to_i } || @restaurants.first
 
       # Get last sync time for UI
-      @last_sync = ClientStat.maximum(:synced_at)
+      @last_sync = RestaurantStat.maximum(:synced_at)
 
       # Get analytics data using service
-      if @selected_client
-        stats_service = Analytics::ClientStatsService.new(
-          @selected_client,
+      if @selected_restaurant
+        stats_service = Analytics::RestaurantStatsService.new(
+          @selected_restaurant,
           start_date: @start_date,
           end_date: @end_date
         )
