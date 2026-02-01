@@ -5,7 +5,7 @@ import consumer from "channels/consumer"
 // Sends questions to N8N webhook for Claude analysis (async via ActionCable)
 export default class extends Controller {
   static targets = ["input", "messages", "sendButton"]
-  static values = { clientId: Number }
+  static values = { restaurantId: Number }
 
   connect() {
     this.subscription = null
@@ -48,7 +48,7 @@ export default class extends Controller {
         },
         body: JSON.stringify({
           question: message,
-          client_id: this.clientIdValue || null
+          restaurant_id: this.restaurantIdValue || null
         })
       })
 

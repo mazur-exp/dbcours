@@ -13,7 +13,7 @@ module Api
     # Отправляет вопрос в N8N workflow для AI-анализа
     def analyze
       question = params[:question]
-      client_id = params[:client_id]
+      restaurant_id = params[:restaurant_id]
 
       unless question.present?
         return render json: { error: "Вопрос не может быть пустым" }, status: :unprocessable_entity
@@ -23,7 +23,7 @@ module Api
       AiChatAnalysisJob.perform_later(
         session.id.to_s,
         question,
-        client_id,
+        restaurant_id,
         @current_user&.id
       )
 

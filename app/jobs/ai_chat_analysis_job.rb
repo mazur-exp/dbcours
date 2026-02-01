@@ -1,11 +1,11 @@
 class AiChatAnalysisJob < ApplicationJob
   queue_as :default
 
-  def perform(session_id, question, client_id, user_id)
+  def perform(session_id, question, restaurant_id, user_id)
     # Отправляем на N8N (может занять 1-2 минуты)
     payload = {
       question: question,
-      client_id: client_id,
+      restaurant_id: restaurant_id,
       user_id: user_id,
       session_id: session_id,
       timestamp: Time.current.iso8601
