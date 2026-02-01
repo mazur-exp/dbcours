@@ -30,7 +30,7 @@ FROM base AS build
 
 # Install packages needed to build gems and Node.js
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y build-essential git libyaml-dev pkg-config curl && \
+    apt-get install --no-install-recommends -y build-essential git libyaml-dev pkg-config curl python3-setuptools && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 # Install Node.js 20.x for delivery data collection script
